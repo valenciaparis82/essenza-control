@@ -275,8 +275,39 @@
         </section>
       </section>
 
+      <section class="backup-section" aria-labelledby="backup-title">
+        <div class="backup-heading">
+          <div>
+            <h2 id="backup-title">Copia de seguridad</h2>
+            <p>Guarda ingredientes, productos y recetas en un archivo JSON o restaura una copia validada.</p>
+          </div>
+          <span class="backup-version">Formato 1</span>
+        </div>
+
+        <div class="backup-actions-grid">
+          <article class="backup-action">
+            <h3>Guardar una copia</h3>
+            <p>Descarga todos los datos actuales. El archivo es manual y no sincroniza dispositivos.</p>
+            <button id="export-backup" type="button">Exportar copia JSON</button>
+          </article>
+
+          <article class="backup-action backup-restore-action">
+            <h3>Restaurar una copia</h3>
+            <p>Primero se valida el archivo. Restaurarlo reemplazará por completo los datos actuales.</p>
+            <div class="field">
+              <label for="import-backup-file">Archivo JSON de Essenza Control</label>
+              <input id="import-backup-file" type="file" accept="application/json,.json" />
+            </div>
+            <button id="restore-backup" type="button" disabled>Restaurar datos validados</button>
+          </article>
+        </div>
+
+        <p id="backup-message" class="backup-message" role="status" aria-live="polite" aria-atomic="true">Selecciona una acción. Ninguna importación modifica datos antes de validarse y confirmarse.</p>
+        <ul id="backup-summary" class="backup-summary" aria-label="Resumen de la copia seleccionada"></ul>
+      </section>
+
       <footer class="page-footer">
-        <p class="note">Cálculo operativo con IVA incluido. Los ingredientes se guardan en este navegador y dispositivo, para esta dirección de la aplicación. No hay copia de seguridad ni sincronización; borrar los datos del navegador puede eliminarlos.</p>
+        <p class="note">Cálculo operativo con IVA incluido. Los datos se guardan en este navegador y dispositivo, para esta dirección de la aplicación. Puedes crear copias manuales en JSON; no hay sincronización y borrar los datos del navegador puede eliminarlos.</p>
       </footer>
     </main>
     <script type="module" src="/src/main.js"></script>

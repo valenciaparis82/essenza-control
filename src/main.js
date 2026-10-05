@@ -9,6 +9,17 @@ import {
   createProductComparisonRows,
   filterAndSortProductComparisonRows,
 } from './product-comparison.js';
+import {
+  normalizeName,
+  PRODUCT_CATEGORIES,
+  validateIngredients,
+  validateProducts,
+} from './data-validation.js';
+import {
+  createBackupDocument,
+  parseBackupText,
+  replaceStoredData,
+} from './backup.js';
 
 function formatNumber(value) {
   // Los valores diminutos usan notación científica para no mostrarse como cero.
@@ -58,6 +69,11 @@ const simulatorPriceInput = document.querySelector('#simulator-price');
 const simulatorMessage = document.querySelector('#simulator-message');
 const applySimulatedPriceButton = document.querySelector('#apply-simulated-price');
 const discardSimulationButton = document.querySelector('#discard-simulation');
+const exportBackupButton = document.querySelector('#export-backup');
+const importBackupInput = document.querySelector('#import-backup-file');
+const restoreBackupButton = document.querySelector('#restore-backup');
+const backupMessage = document.querySelector('#backup-message');
+const backupSummary = document.querySelector('#backup-summary');
 const currentSimulatorOutputs = {
   price: document.querySelector('#current-simulator-price'),
   cost: document.querySelector('#current-simulator-cost'),
@@ -75,9 +91,8 @@ const simulatedOutputs = {
   status: document.querySelector('#simulated-food-cost-status'),
 };
 const productStorageKey = 'essenza.products';
-const productCategories = new Set([
-  'Bocadillos', 'Hamburguesas', 'Tapas', 'Tostadas', 'Bebidas', 'Bolleria', 'Otros',
-]);
+const productCategories = new Set(PRODUCT_CATEGORIES);
+const storageKeys = { ingredients: storageKey, products: productStorageKey };
 let editingIngredientId = null;
 let editingOriginalData = null;
 let editingProductId = null;
@@ -87,10 +102,7 @@ let simulatorProductData = null;
 let simulatorOriginalProductData = null;
 let simulatorIngredientSnapshot = null;
 let simulatorDirty = false;
-
-function normalizeName(name) {
-  return name.trim().toLocaleLowerCase('es-ES');
-}
+let pendingBackup = null;
 
 function getStoredData(ingredient) {
   return {
@@ -110,21 +122,7 @@ function readIngredients() {
   const stored = localStorage.getItem(storageKey);
   if (stored === null) return [];
   const ingredients = JSON.parse(stored);
-  if (!Array.isArray(ingredients)) throw new Error('Formato inválido');
-  const ids = new Set();
-  const names = new Set();
-  for (const ingredient of ingredients) {
-    const archivedIsValid = ingredient?.archived === undefined || typeof ingredient.archived === 'boolean';
-    if (!ingredient || typeof ingredient.id !== 'string' || !ingredient.id.trim()
-      || typeof ingredient.name !== 'string' || typeof ingredient.unit !== 'string'
-      || !archivedIsValid || calculateIngredientCost(ingredient).error
-      || ids.has(ingredient.id) || names.has(normalizeName(ingredient.name))) {
-      throw new Error('Ingrediente inválido');
-    }
-    ids.add(ingredient.id);
-    names.add(normalizeName(ingredient.name));
-  }
-  return ingredients;
+  return validateIngredients(ingredients);
 }
 
 function writeIngredients(ingredients) {
@@ -135,27 +133,7 @@ function readProducts() {
   const stored = localStorage.getItem(productStorageKey);
   if (stored === null) return [];
   const products = JSON.parse(stored);
-  if (!Array.isArray(products)) throw new Error('Formato de productos inválido');
-  const ids = new Set();
-  const names = new Set();
-  for (const product of products) {
-    const archivedIsValid = product?.archived === undefined || typeof product.archived === 'boolean';
-    const recipeIsValid = Array.isArray(product?.recipe) && product.recipe.length > 0
-      && product.recipe.every((line) => line && typeof line.ingredientId === 'string'
-        && line.ingredientId && Number.isFinite(line.quantity) && line.quantity > 0)
-      && new Set(product.recipe.map((line) => line.ingredientId)).size === product.recipe.length;
-    if (!product || typeof product.id !== 'string' || !product.id.trim()
-      || typeof product.name !== 'string' || !product.name.trim()
-      || !productCategories.has(product.category)
-      || !archivedIsValid
-      || !Number.isFinite(product.salePrice) || product.salePrice <= 0
-      || !recipeIsValid || ids.has(product.id) || names.has(normalizeName(product.name))) {
-      throw new Error('Producto inválido');
-    }
-    ids.add(product.id);
-    names.add(normalizeName(product.name));
-  }
-  return products;
+  return validateProducts(products);
 }
 
 function writeProducts(products) {
@@ -1448,6 +1426,141 @@ productForm.addEventListener('submit', (event) => {
   productSaveMessage.textContent = wasEditing
     ? 'Cambios guardados en este navegador.'
     : 'Producto guardado en este navegador.';
+});
+
+function clearPendingBackup(message = '') {
+  pendingBackup = null;
+  restoreBackupButton.disabled = true;
+  backupSummary.replaceChildren();
+  backupMessage.textContent = message;
+}
+
+function addBackupSummaryItem(label, value) {
+  const item = document.createElement('li');
+  const strong = document.createElement('strong');
+  strong.textContent = String(value);
+  item.append(strong, ` ${label}`);
+  backupSummary.append(item);
+}
+
+function formatCount(count, singular, plural = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function renderBackupSummary(summary, fileName) {
+  backupSummary.replaceChildren();
+  addBackupSummaryItem(summary.ingredients === 1 ? 'ingrediente' : 'ingredientes', summary.ingredients);
+  addBackupSummaryItem(summary.products === 1 ? 'producto' : 'productos', summary.products);
+  addBackupSummaryItem('ingredientes archivados', summary.archivedIngredients);
+  addBackupSummaryItem('productos archivados', summary.archivedProducts);
+  if (summary.productsWithMissingIngredients > 0) {
+    addBackupSummaryItem(
+      summary.productsWithMissingIngredients === 1
+        ? 'producto no calculable por referencias inexistentes'
+        : 'productos no calculables por referencias inexistentes',
+      summary.productsWithMissingIngredients,
+    );
+  }
+  backupMessage.textContent = `“${fileName}” es una copia válida. Revisa el resumen antes de restaurarla.`;
+}
+
+function hasPendingInterfaceChanges() {
+  const ingredientHasData = editingIngredientId !== null
+    || [...form.elements].some((control) => control instanceof HTMLInputElement
+      && control.type !== 'checkbox' && control.value.trim() !== '');
+  return ingredientHasData || productFormDirty || editingProductId !== null || simulatorDirty;
+}
+
+exportBackupButton.addEventListener('click', () => {
+  let ingredients;
+  let products;
+  try {
+    ingredients = readIngredients();
+    products = readProducts();
+  } catch {
+    clearPendingBackup('No se puede exportar: los datos guardados están dañados o no se pueden leer. No se ha generado ningún archivo.');
+    return;
+  }
+
+  try {
+    const backupDocument = createBackupDocument(ingredients, products);
+    const blob = new Blob([`${JSON.stringify(backupDocument, null, 2)}\n`], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `essenza-control-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    backupMessage.textContent = `Copia exportada con ${formatCount(ingredients.length, 'ingrediente')} y ${formatCount(products.length, 'producto')}.`;
+  } catch {
+    backupMessage.textContent = 'No se ha podido generar o descargar la copia. Los datos guardados no se han modificado.';
+  }
+});
+
+importBackupInput.addEventListener('change', async () => {
+  const [file] = importBackupInput.files;
+  clearPendingBackup();
+  if (!file) return;
+
+  let expectedRawValues;
+  try {
+    expectedRawValues = {
+      ingredients: localStorage.getItem(storageKey),
+      products: localStorage.getItem(productStorageKey),
+    };
+  } catch {
+    clearPendingBackup('El navegador no permite acceder al almacenamiento. No se ha modificado ningún dato.');
+    return;
+  }
+
+  backupMessage.textContent = 'Validando la copia seleccionada…';
+  try {
+    const parsed = parseBackupText(await file.text());
+    pendingBackup = { ...parsed, expectedRawValues, fileName: file.name };
+    renderBackupSummary(parsed.summary, file.name);
+    restoreBackupButton.disabled = false;
+    restoreBackupButton.focus();
+  } catch (error) {
+    importBackupInput.value = '';
+    clearPendingBackup(`${error.message} No se ha modificado ningún dato.`);
+  }
+});
+
+restoreBackupButton.addEventListener('click', () => {
+  if (!pendingBackup) return;
+  const { data, summary, expectedRawValues } = pendingBackup;
+  const isEmpty = summary.ingredients === 0 && summary.products === 0;
+  const missingReferenceWarning = summary.productsWithMissingIngredients > 0
+    ? `\n\n${formatCount(summary.productsWithMissingIngredients, 'producto')} quedarán como no calculables porque contienen referencias a ingredientes inexistentes.`
+    : '';
+  const pendingChangesWarning = hasPendingInterfaceChanges()
+    ? '\n\nLas ediciones o simulaciones sin guardar se descartarán solo si la restauración termina correctamente.'
+    : '';
+  const emptyWarning = isEmpty
+    ? '\n\nATENCIÓN: esta copia está completamente vacía y eliminará todos los ingredientes y productos actuales.'
+    : '';
+  const confirmation = `Restaurar esta copia reemplazará todos los datos actuales por ${formatCount(summary.ingredients, 'ingrediente')} y ${formatCount(summary.products, 'producto')}.${emptyWarning}${missingReferenceWarning}${pendingChangesWarning}\n\n¿Quieres continuar?`;
+  if (!window.confirm(confirmation)) {
+    backupMessage.textContent = 'Restauración cancelada. La copia validada sigue preparada y no se ha modificado ningún dato.';
+    return;
+  }
+
+  try {
+    replaceStoredData(localStorage, storageKeys, data, expectedRawValues);
+    const restoredIngredients = readIngredients();
+    readProducts();
+    finishEditing({ focus: false });
+    finishProductEditing(restoredIngredients, { focus: false });
+    saveMessage.textContent = '';
+    productSaveMessage.textContent = '';
+    importBackupInput.value = '';
+    clearPendingBackup(`Copia restaurada correctamente: ${formatCount(summary.ingredients, 'ingrediente')} y ${formatCount(summary.products, 'producto')}.`);
+    exportBackupButton.focus();
+  } catch (error) {
+    backupMessage.textContent = error.message;
+  }
 });
 
 renderStoredIngredients();

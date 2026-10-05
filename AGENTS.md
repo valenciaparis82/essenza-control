@@ -208,6 +208,24 @@ No crear archivos, módulos o abstracciones antes de que hagan falta.
 
 \- Los datos históricos futuros deberán conservar precios y costes del momento.
 
+\- Las copias de seguridad usan un formato JSON estricto con identificador de aplicación y versión explícita.
+
+\- Una copia incluye ingredientes y productos completos, conservando IDs, recetas y estado de archivado; no incluye costes ni indicadores derivados.
+
+\- La importación se valida por completo antes de modificar localStorage; un archivo dañado, incompleto o incompatible no puede sobrescribir los datos existentes.
+
+\- Restaurar una copia reemplaza todos los datos solo tras confirmación explícita; no fusiona registros, regenera IDs ni corrige recetas automáticamente.
+
+\- Las referencias a ingredientes inexistentes se conservan con advertencia y mantienen el producto como no calculable.
+
+\- Se permite restaurar una copia vacía con una advertencia reforzada y una copia válida puede reemplazar datos locales dañados.
+
+\- Si falla una escritura durante la restauración, se deben recuperar los valores anteriores y no comunicar éxito.
+
+\- Las ediciones y simulaciones pendientes solo se descartan después de una restauración confirmada y completada correctamente.
+
+\- Las copias son manuales y no se deben presentar como sincronización, historial automático ni respaldo remoto.
+
 
 
 \## Fórmulas
