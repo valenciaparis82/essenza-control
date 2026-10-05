@@ -1,7 +1,8 @@
-import { validateDataSet } from './data-validation.js';
+import { validateDataSet, validateIngredients, validateProducts } from './data-validation.js';
 
 export const BACKUP_APPLICATION = 'essenza-control';
-export const BACKUP_FORMAT_VERSION = 1;
+export const BACKUP_FORMAT_VERSION = 2;
+const LEGACY_BACKUP_FORMAT_VERSION = 1;
 
 function hasExactKeys(value, expectedKeys) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -35,8 +36,19 @@ function canonicalProduct(product) {
   };
 }
 
-export function createBackupDocument(ingredients, products, exportedAt = new Date()) {
-  validateDataSet({ ingredients, products });
+function canonicalSale(sale) {
+  return {
+    id: sale.id,
+    date: sale.date,
+    productId: sale.productId,
+    units: sale.units,
+    unitSalePrice: sale.unitSalePrice,
+    unitCost: sale.unitCost,
+  };
+}
+
+export function createBackupDocument(ingredients, products, sales, exportedAt = new Date()) {
+  validateDataSet({ ingredients, products, sales });
   const document = {
     application: BACKUP_APPLICATION,
     formatVersion: BACKUP_FORMAT_VERSION,
@@ -44,10 +56,19 @@ export function createBackupDocument(ingredients, products, exportedAt = new Dat
     data: {
       ingredients: ingredients.map(canonicalIngredient),
       products: products.map(canonicalProduct),
+      sales: sales.map(canonicalSale),
     },
   };
   validateBackupDocument(document);
   return document;
+}
+
+function validateExportDate(exportedAtValue) {
+  const exportedAt = typeof exportedAtValue === 'string' ? new Date(exportedAtValue) : null;
+  if (!exportedAt || Number.isNaN(exportedAt.getTime())
+    || exportedAt.toISOString() !== exportedAtValue) {
+    throw new Error('La fecha de exportación de la copia no es válida.');
+  }
 }
 
 export function validateBackupDocument(document) {
@@ -57,17 +78,20 @@ export function validateBackupDocument(document) {
   if (document.application !== BACKUP_APPLICATION) {
     throw new Error('El archivo no pertenece a Essenza Control.');
   }
-  if (document.formatVersion !== BACKUP_FORMAT_VERSION) {
-    throw new Error(`La versión de la copia no es compatible. Esta aplicación admite la versión ${BACKUP_FORMAT_VERSION}.`);
+  if (![LEGACY_BACKUP_FORMAT_VERSION, BACKUP_FORMAT_VERSION].includes(document.formatVersion)) {
+    throw new Error(`La versión de la copia no es compatible. Esta aplicación admite las versiones ${LEGACY_BACKUP_FORMAT_VERSION} y ${BACKUP_FORMAT_VERSION}.`);
   }
-  const exportedAt = typeof document.exportedAt === 'string'
-    ? new Date(document.exportedAt)
-    : null;
-  if (!exportedAt || Number.isNaN(exportedAt.getTime())
-    || exportedAt.toISOString() !== document.exportedAt) {
-    throw new Error('La fecha de exportación de la copia no es válida.');
+  validateExportDate(document.exportedAt);
+
+  if (document.formatVersion === LEGACY_BACKUP_FORMAT_VERSION) {
+    if (!hasExactKeys(document.data, ['ingredients', 'products'])) {
+      throw new Error('La estructura de datos de la copia no es válida.');
+    }
+    validateIngredients(document.data.ingredients, { strict: true });
+    validateProducts(document.data.products, { strict: true });
+  } else {
+    validateDataSet(document.data, { strict: true });
   }
-  validateDataSet(document.data, { strict: true });
   return document;
 }
 
@@ -79,20 +103,32 @@ export function parseBackupText(text) {
     throw new Error('El archivo no contiene un JSON válido.');
   }
   validateBackupDocument(document);
-  const ingredientIds = new Set(document.data.ingredients.map((ingredient) => ingredient.id));
-  const productsWithMissingIngredients = document.data.products.filter((product) => (
+  const isLegacy = document.formatVersion === LEGACY_BACKUP_FORMAT_VERSION;
+  const data = {
+    ingredients: document.data.ingredients,
+    products: document.data.products,
+    sales: isLegacy ? [] : document.data.sales,
+  };
+  const ingredientIds = new Set(data.ingredients.map((ingredient) => ingredient.id));
+  const productIds = new Set(data.products.map((product) => product.id));
+  const productsWithMissingIngredients = data.products.filter((product) => (
     product.recipe.some((line) => !ingredientIds.has(line.ingredientId))
   )).length;
+  const salesWithMissingProducts = data.sales.filter((sale) => !productIds.has(sale.productId)).length;
 
   return {
     document,
-    data: document.data,
+    data,
     summary: {
-      ingredients: document.data.ingredients.length,
-      archivedIngredients: document.data.ingredients.filter((item) => item.archived === true).length,
-      products: document.data.products.length,
-      archivedProducts: document.data.products.filter((item) => item.archived === true).length,
+      formatVersion: document.formatVersion,
+      ingredients: data.ingredients.length,
+      archivedIngredients: data.ingredients.filter((item) => item.archived === true).length,
+      products: data.products.length,
+      archivedProducts: data.products.filter((item) => item.archived === true).length,
       productsWithMissingIngredients,
+      sales: data.sales.length,
+      salesWithMissingProducts,
+      clearsSales: isLegacy,
     },
   };
 }
@@ -104,29 +140,26 @@ function restoreRawValue(storage, key, value) {
 
 export function replaceStoredData(storage, keys, data, expectedRawValues) {
   validateDataSet(data, { strict: true });
-  const currentIngredients = storage.getItem(keys.ingredients);
-  const currentProducts = storage.getItem(keys.products);
-  if (currentIngredients !== expectedRawValues.ingredients
-    || currentProducts !== expectedRawValues.products) {
+  const names = ['ingredients', 'products', 'sales'];
+  const currentValues = Object.fromEntries(names.map((name) => [name, storage.getItem(keys[name])]));
+  if (names.some((name) => currentValues[name] !== expectedRawValues[name])) {
     throw new Error('Los datos actuales han cambiado desde que seleccionaste la copia. Vuelve a elegir el archivo para evitar sobrescribir esos cambios.');
   }
 
-  const serializedIngredients = JSON.stringify(data.ingredients);
-  const serializedProducts = JSON.stringify(data.products);
+  const serializedValues = Object.fromEntries(names.map((name) => [name, JSON.stringify(data[name])]));
   try {
-    storage.setItem(keys.ingredients, serializedIngredients);
-    storage.setItem(keys.products, serializedProducts);
-    if (storage.getItem(keys.ingredients) !== serializedIngredients
-      || storage.getItem(keys.products) !== serializedProducts) {
+    for (const name of names) storage.setItem(keys[name], serializedValues[name]);
+    if (names.some((name) => storage.getItem(keys[name]) !== serializedValues[name])) {
       throw new Error('No se pudo comprobar la escritura completa.');
     }
   } catch {
     let rollbackFailed = false;
-    try {
-      restoreRawValue(storage, keys.ingredients, currentIngredients);
-      restoreRawValue(storage, keys.products, currentProducts);
-    } catch {
-      rollbackFailed = true;
+    for (const name of names) {
+      try {
+        restoreRawValue(storage, keys[name], currentValues[name]);
+      } catch {
+        rollbackFailed = true;
+      }
     }
     if (rollbackFailed) {
       throw new Error('Falló la restauración y el navegador tampoco permitió recuperar automáticamente los datos anteriores. No recargues la página y exporta los datos disponibles si es posible.');

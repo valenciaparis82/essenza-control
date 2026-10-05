@@ -1,4 +1,5 @@
 import { calculateIngredientCost } from './calculations.js';
+import { calculateSaleTotals, getLocalDateString, getSaleValidationError } from './sales.js';
 
 export const PRODUCT_CATEGORIES = Object.freeze([
   'Bocadillos',
@@ -82,12 +83,31 @@ export function validateProducts(products, { strict = false } = {}) {
   return products;
 }
 
+export function validateSales(sales, { strict = false } = {}) {
+  if (!Array.isArray(sales)) throw new Error('La lista de ventas no es válida.');
+  const ids = new Set();
+
+  for (const sale of sales) {
+    const keysAreValid = !strict || (isPlainObject(sale)
+      && hasOnlyKeys(sale, ['id', 'date', 'productId', 'units', 'unitSalePrice', 'unitCost']));
+    if (!isPlainObject(sale) || !keysAreValid
+      || getSaleValidationError(sale, { today: getLocalDateString() })
+      || calculateSaleTotals(sale).error
+      || ids.has(sale.id)) {
+      throw new Error('La copia contiene una venta inválida o duplicada.');
+    }
+    ids.add(sale.id);
+  }
+  return sales;
+}
+
 export function validateDataSet(data, { strict = false } = {}) {
   if (!isPlainObject(data)
-    || (strict && !hasOnlyKeys(data, ['ingredients', 'products']))) {
+    || (strict && !hasOnlyKeys(data, ['ingredients', 'products', 'sales']))) {
     throw new Error('La estructura de datos de la copia no es válida.');
   }
   validateIngredients(data.ingredients, { strict });
   validateProducts(data.products, { strict });
+  validateSales(data.sales, { strict });
   return data;
 }

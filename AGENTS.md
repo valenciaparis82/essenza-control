@@ -26,13 +26,13 @@ Construir una aplicación web responsive para la cafetería Essenza que permita 
 
 \- simulación de precios
 
+\- ventas diarias por producto
+
 
 
 Más adelante podrá ampliarse con:
 
 
-
-\- ventas
 
 \- gastos
 
@@ -206,11 +206,33 @@ No crear archivos, módulos o abstracciones antes de que hagan falta.
 
 \- El semáforo visual debe acompañar siempre el color con texto.
 
-\- Los datos históricos futuros deberán conservar precios y costes del momento.
+\- Cada venta debe tener un ID estable, fecha, referencia al producto por su ID, unidades vendidas, precio unitario histórico y coste unitario histórico.
+
+\- Las unidades vendidas deben ser números enteros mayores que cero y no se permiten fechas futuras.
+
+\- Varias ventas del mismo producto y día se guardan como registros independientes.
+
+\- Al registrar una venta se capturan el precio y el coste actuales; registrar una fecha anterior no recupera valores históricos que no se hubieran guardado entonces.
+
+\- Los cambios posteriores en productos, recetas, ingredientes o precios no deben recalcular ventas anteriores.
+
+\- Los ingresos, el coste total vendido y el margen generado son valores derivados y no se guardan.
+
+\- Solo se pueden registrar ventas nuevas de productos activos y calculables; archivar un producto no elimina ni invalida sus ventas anteriores.
+
+\- Una venta con referencia a un producto inexistente conserva sus importes históricos y se muestra con advertencia.
+
+\- Editar una venta conserva su ID. Cambiar solo fecha o unidades conserva precio y coste históricos; cambiar el producto captura los importes actuales del nuevo producto.
+
+\- La eliminación definitiva de una venta requiere confirmación y se usa únicamente para corregir registros erróneos.
+
+\- El resumen de ventas de esta fase es diario; no incluye informes semanales, mensuales ni gráficos.
 
 \- Las copias de seguridad usan un formato JSON estricto con identificador de aplicación y versión explícita.
 
-\- Una copia incluye ingredientes y productos completos, conservando IDs, recetas y estado de archivado; no incluye costes ni indicadores derivados.
+\- Una copia incluye ingredientes, productos y ventas completos, conservando IDs, recetas, estado de archivado y valores históricos de ventas; no incluye otros costes ni indicadores derivados.
+
+\- El formato de copia 2 incluye ventas. El formato 1 sigue siendo importable, pero restaura las ventas como una lista vacía con una advertencia explícita.
 
 \- La importación se valida por completo antes de modificar localStorage; un archivo dañado, incompleto o incompatible no puede sobrescribir los datos existentes.
 
@@ -261,6 +283,22 @@ Food cost:
 
 
 coste total / precio de venta \* 100
+
+
+
+Ingresos de una venta:
+
+
+
+precio unitario histórico \* unidades vendidas
+
+
+
+Margen generado por una venta:
+
+
+
+(precio unitario histórico - coste unitario histórico) \* unidades vendidas
 
 
 

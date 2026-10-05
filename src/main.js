@@ -14,12 +14,19 @@ import {
   PRODUCT_CATEGORIES,
   validateIngredients,
   validateProducts,
+  validateSales,
 } from './data-validation.js';
 import {
   createBackupDocument,
   parseBackupText,
   replaceStoredData,
 } from './backup.js';
+import {
+  calculateSaleTotals,
+  getLocalDateString,
+  getSaleValidationError,
+  summarizeSalesByDate,
+} from './sales.js';
 
 function formatNumber(value) {
   // Los valores diminutos usan notación científica para no mostrarse como cero.
@@ -69,6 +76,27 @@ const simulatorPriceInput = document.querySelector('#simulator-price');
 const simulatorMessage = document.querySelector('#simulator-message');
 const applySimulatedPriceButton = document.querySelector('#apply-simulated-price');
 const discardSimulationButton = document.querySelector('#discard-simulation');
+const saleForm = document.querySelector('#sale-form');
+const saleFormTitle = document.querySelector('#sale-form-title');
+const saleDateInput = document.querySelector('#sale-date');
+const saleProductInput = document.querySelector('#sale-product');
+const saleUnitsInput = document.querySelector('#sale-units');
+const saveSaleButton = document.querySelector('#save-sale-button');
+const cancelSaleEditButton = document.querySelector('#cancel-sale-edit-button');
+const salePreviewMessage = document.querySelector('#sale-preview-message');
+const saleUnitPriceOutput = document.querySelector('#sale-unit-price');
+const saleUnitCostOutput = document.querySelector('#sale-unit-cost');
+const saleRevenueOutput = document.querySelector('#sale-revenue');
+const saleMarginOutput = document.querySelector('#sale-margin');
+const saleSaveMessage = document.querySelector('#sale-save-message');
+const salesDateFilterInput = document.querySelector('#sales-date-filter');
+const dailyUnitsOutput = document.querySelector('#daily-units');
+const dailyRevenueOutput = document.querySelector('#daily-revenue');
+const dailyCostOutput = document.querySelector('#daily-cost');
+const dailyMarginOutput = document.querySelector('#daily-margin');
+const salesListMessage = document.querySelector('#sales-list-message');
+const salesTableWrapper = document.querySelector('#sales-table-wrapper');
+const salesBody = document.querySelector('#sales-body');
 const exportBackupButton = document.querySelector('#export-backup');
 const importBackupInput = document.querySelector('#import-backup-file');
 const restoreBackupButton = document.querySelector('#restore-backup');
@@ -91,8 +119,9 @@ const simulatedOutputs = {
   status: document.querySelector('#simulated-food-cost-status'),
 };
 const productStorageKey = 'essenza.products';
+const salesStorageKey = 'essenza.sales';
 const productCategories = new Set(PRODUCT_CATEGORIES);
-const storageKeys = { ingredients: storageKey, products: productStorageKey };
+const storageKeys = { ingredients: storageKey, products: productStorageKey, sales: salesStorageKey };
 let editingIngredientId = null;
 let editingOriginalData = null;
 let editingProductId = null;
@@ -102,6 +131,10 @@ let simulatorProductData = null;
 let simulatorOriginalProductData = null;
 let simulatorIngredientSnapshot = null;
 let simulatorDirty = false;
+let editingSaleId = null;
+let editingOriginalSaleData = null;
+let saleFormDirty = false;
+let salePreviewProductSignature = null;
 let pendingBackup = null;
 
 function getStoredData(ingredient) {
@@ -138,6 +171,17 @@ function readProducts() {
 
 function writeProducts(products) {
   localStorage.setItem(productStorageKey, JSON.stringify(products));
+}
+
+function readSales() {
+  const stored = localStorage.getItem(salesStorageKey);
+  if (stored === null) return [];
+  const sales = JSON.parse(stored);
+  return validateSales(sales);
+}
+
+function writeSales(sales) {
+  localStorage.setItem(salesStorageKey, JSON.stringify(sales));
 }
 
 function getStoredProductData(product) {
@@ -1062,6 +1106,7 @@ function refreshProductFeatures(knownIngredients = null) {
   renderStoredProducts(ingredients);
   refreshProductComparison(ingredients);
   refreshPriceSimulator(ingredients);
+  refreshSales(null, ingredients);
 }
 
 addRecipeLineButton.addEventListener('click', () => {
@@ -1282,6 +1327,7 @@ applySimulatedPriceButton.addEventListener('click', () => {
   renderProducts(latestProducts, latestIngredients);
   renderProductComparison(latestProducts, latestIngredients);
   loadSimulatorProduct(updatedProduct, latestIngredients);
+  refreshSales(latestProducts, latestIngredients);
   simulatorMessage.textContent = `Precio de ${updatedProduct.name} actualizado en este navegador.`;
 });
 
@@ -1348,6 +1394,7 @@ productList.addEventListener('click', (event) => {
     renderProducts(products, ingredients);
     renderProductComparison(products, ingredients);
     refreshPriceSimulator(ingredients);
+    refreshSales(products, ingredients);
   }
   productSaveMessage.textContent = action === 'archive'
     ? `${product.name} se ha archivado.`
@@ -1428,6 +1475,404 @@ productForm.addEventListener('submit', (event) => {
     : 'Producto guardado en este navegador.';
 });
 
+function formatCalendarDate(date) {
+  const [year, month, day] = date.split('-').map(Number);
+  return new Intl.DateTimeFormat('es-ES', {
+    day: 'numeric', month: 'long', year: 'numeric',
+  }).format(new Date(year, month - 1, day));
+}
+
+function getSaleProductSignature(product, ingredients) {
+  return JSON.stringify({
+    product: getStoredProductData(product),
+    ingredients: getSimulatorIngredientSnapshot(product, ingredients),
+  });
+}
+
+function resetSalePreview(message = 'Completa la venta para calcular el resultado.') {
+  salePreviewProductSignature = null;
+  salePreviewMessage.textContent = message;
+  saleUnitPriceOutput.textContent = '—';
+  saleUnitCostOutput.textContent = '—';
+  saleRevenueOutput.textContent = '—';
+  saleMarginOutput.textContent = '—';
+  saleMarginOutput.classList.remove('negative-value');
+}
+
+function renderSalePreview(sale, message) {
+  const totals = calculateSaleTotals(sale);
+  if (totals.error) {
+    resetSalePreview(totals.error);
+    return;
+  }
+  salePreviewMessage.textContent = message;
+  saleUnitPriceOutput.textContent = `${formatNumber(sale.unitSalePrice)} €`;
+  saleUnitCostOutput.textContent = `${formatNumber(sale.unitCost)} €`;
+  saleRevenueOutput.textContent = `${formatNumber(totals.revenue)} €`;
+  saleMarginOutput.textContent = `${formatNumber(totals.grossMargin)} €`;
+  saleMarginOutput.classList.toggle('negative-value', totals.grossMargin < 0);
+}
+
+function populateSaleProducts(products) {
+  const currentValue = saleProductInput.value || editingOriginalSaleData?.productId || '';
+  saleProductInput.replaceChildren();
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  const activeProducts = products.filter((product) => product.archived !== true);
+  placeholder.textContent = activeProducts.length ? 'Selecciona un producto' : 'No hay productos activos';
+  saleProductInput.append(placeholder);
+
+  for (const product of activeProducts) {
+    const option = document.createElement('option');
+    option.value = product.id;
+    option.textContent = product.name;
+    saleProductInput.append(option);
+  }
+
+  if (editingOriginalSaleData && !activeProducts.some((product) => product.id === editingOriginalSaleData.productId)) {
+    const storedProduct = products.find((product) => product.id === editingOriginalSaleData.productId);
+    const unavailable = document.createElement('option');
+    unavailable.value = editingOriginalSaleData.productId;
+    unavailable.textContent = storedProduct ? `${storedProduct.name} (archivado)` : 'Producto no disponible';
+    unavailable.disabled = true;
+    saleProductInput.append(unavailable);
+  }
+  saleProductInput.value = currentValue;
+  saleProductInput.disabled = activeProducts.length === 0 && editingOriginalSaleData === null;
+}
+
+function updateSalePreview(knownProducts = null, knownIngredients = null) {
+  const units = saleUnitsInput.valueAsNumber;
+  const productId = saleProductInput.value;
+  if (!productId || !Number.isSafeInteger(units) || units <= 0) {
+    resetSalePreview(!productId
+      ? 'Selecciona un producto e introduce unidades enteras mayores que cero.'
+      : 'Las unidades vendidas deben ser un número entero mayor que cero.');
+    return;
+  }
+
+  if (editingOriginalSaleData && productId === editingOriginalSaleData.productId) {
+    renderSalePreview({ ...editingOriginalSaleData, units }, 'Se conservan el precio y el coste históricos de esta venta.');
+    return;
+  }
+
+  try {
+    const products = knownProducts ?? readProducts();
+    const ingredients = knownIngredients ?? readIngredients();
+    const product = products.find((item) => item.id === productId && item.archived !== true);
+    if (!product) {
+      resetSalePreview('El producto ya no está activo o disponible.');
+      return;
+    }
+    const indicators = calculateProductIndicators(product, ingredients);
+    if (indicators.error) {
+      resetSalePreview(`No se puede registrar este producto: ${indicators.error}`);
+      return;
+    }
+    salePreviewProductSignature = getSaleProductSignature(product, ingredients);
+    renderSalePreview({
+      id: editingSaleId ?? 'vista-previa',
+      date: saleDateInput.value || getLocalDateString(),
+      productId,
+      units,
+      unitSalePrice: product.salePrice,
+      unitCost: indicators.totalCost,
+    }, 'Vista previa con el precio y el coste actuales. Se guardarán como datos históricos.');
+  } catch {
+    resetSalePreview('No se pueden leer los productos o ingredientes guardados.');
+  }
+}
+
+function createSaleTableCell(label, content, className = '') {
+  const cell = document.createElement('td');
+  cell.dataset.label = label;
+  cell.textContent = content;
+  if (className) cell.className = className;
+  return cell;
+}
+
+function renderDailySales(sales, products) {
+  salesBody.replaceChildren();
+  const selectedDate = salesDateFilterInput.value || getLocalDateString();
+  salesDateFilterInput.value = selectedDate;
+  const summary = summarizeSalesByDate(sales, selectedDate);
+  if (summary.error) {
+    dailyUnitsOutput.textContent = '—';
+    dailyRevenueOutput.textContent = '—';
+    dailyCostOutput.textContent = '—';
+    dailyMarginOutput.textContent = '—';
+    dailyMarginOutput.classList.remove('negative-value');
+    salesTableWrapper.hidden = true;
+    salesListMessage.hidden = false;
+    salesListMessage.textContent = `No se puede calcular el resumen: ${summary.error}`;
+    return;
+  }
+
+  dailyUnitsOutput.textContent = formatNumber(summary.units);
+  dailyRevenueOutput.textContent = `${formatNumber(summary.revenue)} €`;
+  dailyCostOutput.textContent = `${formatNumber(summary.totalCost)} €`;
+  dailyMarginOutput.textContent = `${formatNumber(summary.grossMargin)} €`;
+  dailyMarginOutput.classList.toggle('negative-value', summary.grossMargin < 0);
+  salesListMessage.hidden = summary.records.length > 0;
+  salesTableWrapper.hidden = summary.records.length === 0;
+  salesListMessage.textContent = `Todavía no hay ventas registradas para el ${formatCalendarDate(selectedDate)}.`;
+  const productMap = new Map(products.map((product) => [product.id, product]));
+
+  for (const sale of summary.records) {
+    const totals = calculateSaleTotals(sale);
+    const product = productMap.get(sale.productId);
+    const row = document.createElement('tr');
+    const name = document.createElement('th');
+    name.scope = 'row';
+    name.dataset.label = 'Producto';
+    name.textContent = product?.name ?? 'Producto no disponible';
+    if (!product) name.className = 'sale-product-missing';
+    const actionsCell = document.createElement('td');
+    actionsCell.dataset.label = 'Acciones';
+    const actions = document.createElement('div');
+    actions.className = 'sale-actions';
+    const editButton = document.createElement('button');
+    editButton.type = 'button';
+    editButton.textContent = 'Editar';
+    editButton.dataset.saleAction = 'edit';
+    editButton.dataset.saleId = sale.id;
+    const deleteButton = document.createElement('button');
+    deleteButton.type = 'button';
+    deleteButton.textContent = 'Eliminar';
+    deleteButton.className = 'secondary-button';
+    deleteButton.dataset.saleAction = 'delete';
+    deleteButton.dataset.saleId = sale.id;
+    actions.append(editButton, deleteButton);
+    actionsCell.append(actions);
+    const marginClass = totals.grossMargin < 0 ? 'numeric-value negative-value' : 'numeric-value';
+    row.append(
+      name,
+      createSaleTableCell('Unidades', formatNumber(sale.units), 'numeric-value'),
+      createSaleTableCell('Precio unidad', `${formatNumber(sale.unitSalePrice)} €`, 'numeric-value'),
+      createSaleTableCell('Coste unidad', `${formatNumber(sale.unitCost)} €`, 'numeric-value'),
+      createSaleTableCell('Ingresos', `${formatNumber(totals.revenue)} €`, 'numeric-value'),
+      createSaleTableCell('Margen', `${formatNumber(totals.grossMargin)} €`, marginClass),
+      actionsCell,
+    );
+    salesBody.append(row);
+  }
+}
+
+function refreshSales(knownProducts = null, knownIngredients = null) {
+  try {
+    const products = knownProducts ?? readProducts();
+    const ingredients = knownIngredients ?? readIngredients();
+    const sales = readSales();
+    populateSaleProducts(products);
+    updateSalePreview(products, ingredients);
+    renderDailySales(sales, products);
+    return true;
+  } catch {
+    resetSalePreview('No se pueden recuperar los datos necesarios para registrar ventas.');
+    salesBody.replaceChildren();
+    salesTableWrapper.hidden = true;
+    salesListMessage.hidden = false;
+    salesListMessage.textContent = 'No se pueden recuperar las ventas. Los datos pueden estar dañados o el almacenamiento estar bloqueado. No se han sobrescrito.';
+    return false;
+  }
+}
+
+function finishSaleEditing({ focus = true } = {}) {
+  editingSaleId = null;
+  editingOriginalSaleData = null;
+  saleFormDirty = false;
+  saleForm.reset();
+  saleDateInput.value = getLocalDateString();
+  saleFormTitle.textContent = 'Registrar venta';
+  saveSaleButton.textContent = 'Registrar venta';
+  cancelSaleEditButton.hidden = true;
+  refreshSales();
+  saleFormDirty = false;
+  if (focus) saleDateInput.focus();
+}
+
+function startEditingSale(sale) {
+  editingSaleId = sale.id;
+  editingOriginalSaleData = { ...sale };
+  saleDateInput.value = sale.date;
+  saleProductInput.value = sale.productId;
+  saleUnitsInput.value = sale.units;
+  saleFormTitle.textContent = 'Editar venta';
+  saveSaleButton.textContent = 'Guardar cambios';
+  cancelSaleEditButton.hidden = false;
+  saleFormDirty = false;
+  refreshSales();
+  saleFormDirty = false;
+  saleSaveMessage.textContent = 'Edita la fecha o las unidades para conservar los importes históricos. Si cambias el producto, se capturarán sus importes actuales.';
+  saleForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  saleDateInput.focus();
+}
+
+saleForm.addEventListener('input', () => {
+  saleFormDirty = true;
+  updateSalePreview();
+});
+
+saleForm.addEventListener('change', () => {
+  saleFormDirty = true;
+  updateSalePreview();
+});
+
+saleForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const date = saleDateInput.value;
+  const productId = saleProductInput.value;
+  const units = saleUnitsInput.valueAsNumber;
+  let products;
+  let ingredients;
+  let sales;
+  try {
+    products = readProducts();
+    ingredients = readIngredients();
+    sales = readSales();
+  } catch {
+    saleSaveMessage.textContent = 'No se pueden leer los datos guardados. No se ha sobrescrito ninguna venta.';
+    return;
+  }
+
+  let unitSalePrice;
+  let unitCost;
+  const keepsHistoricalValues = editingOriginalSaleData?.productId === productId;
+  if (keepsHistoricalValues) {
+    ({ unitSalePrice, unitCost } = editingOriginalSaleData);
+  } else {
+    const product = products.find((item) => item.id === productId && item.archived !== true);
+    if (!product) {
+      saleSaveMessage.textContent = 'Selecciona un producto activo y disponible.';
+      refreshSales(products, ingredients);
+      return;
+    }
+    const indicators = calculateProductIndicators(product, ingredients);
+    if (indicators.error) {
+      saleSaveMessage.textContent = `No se puede registrar este producto: ${indicators.error}`;
+      refreshSales(products, ingredients);
+      return;
+    }
+    const latestSignature = getSaleProductSignature(product, ingredients);
+    if (latestSignature !== salePreviewProductSignature) {
+      updateSalePreview(products, ingredients);
+      saleSaveMessage.textContent = 'El precio, la receta o sus ingredientes han cambiado. Revisa la vista previa actualizada y vuelve a guardar.';
+      return;
+    }
+    unitSalePrice = product.salePrice;
+    unitCost = indicators.totalCost;
+  }
+
+  const sale = {
+    id: editingSaleId ?? crypto.randomUUID(),
+    date,
+    productId,
+    units,
+    unitSalePrice,
+    unitCost,
+  };
+  const validationError = getSaleValidationError(sale, { today: getLocalDateString() });
+  if (validationError) {
+    saleSaveMessage.textContent = validationError;
+    return;
+  }
+  if (calculateSaleTotals(sale).error) {
+    saleSaveMessage.textContent = calculateSaleTotals(sale).error;
+    return;
+  }
+
+  if (editingSaleId !== null) {
+    const index = sales.findIndex((saved) => saved.id === editingSaleId);
+    if (index === -1 || JSON.stringify(sales[index]) !== JSON.stringify(editingOriginalSaleData)) {
+      saleSaveMessage.textContent = 'Esta venta ha cambiado desde otra pestaña. Cancela la edición y vuelve a abrirla.';
+      refreshSales(products, ingredients);
+      return;
+    }
+    sales[index] = sale;
+  } else {
+    sales.unshift(sale);
+  }
+
+  try {
+    writeSales(sales);
+  } catch {
+    saleSaveMessage.textContent = 'No se ha podido guardar la venta. El formulario se conserva y no se han realizado cambios.';
+    return;
+  }
+  const wasEditing = editingSaleId !== null;
+  salesDateFilterInput.value = date;
+  finishSaleEditing({ focus: false });
+  saleSaveMessage.textContent = wasEditing
+    ? 'Cambios guardados. Los importes históricos se han conservado según el producto seleccionado.'
+    : 'Venta registrada con su precio y coste históricos.';
+  saveSaleButton.focus();
+});
+
+cancelSaleEditButton.addEventListener('click', () => {
+  finishSaleEditing();
+  saleSaveMessage.textContent = 'Edición cancelada. No se ha modificado la venta.';
+});
+
+salesDateFilterInput.addEventListener('change', () => {
+  try {
+    renderDailySales(readSales(), readProducts());
+  } catch {
+    salesListMessage.hidden = false;
+    salesListMessage.textContent = 'No se pueden recuperar las ventas guardadas.';
+  }
+});
+
+salesBody.addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-sale-action]');
+  if (!button) return;
+  const { saleAction, saleId } = button.dataset;
+  let sales;
+  try {
+    sales = readSales();
+  } catch {
+    saleSaveMessage.textContent = 'No se pueden leer las ventas guardadas. No se ha modificado ningún dato.';
+    return;
+  }
+  const sale = sales.find((item) => item.id === saleId);
+  if (!sale) {
+    saleSaveMessage.textContent = 'La venta ya no está disponible. Se ha actualizado el resumen.';
+    refreshSales();
+    return;
+  }
+
+  if (saleAction === 'edit') {
+    if (saleFormDirty && !window.confirm('Hay datos de otra venta sin guardar. ¿Quieres descartarlos?')) return;
+    startEditingSale(sale);
+    return;
+  }
+  if (saleAction !== 'delete') return;
+  const product = (() => {
+    try { return readProducts().find((item) => item.id === sale.productId); } catch { return null; }
+  })();
+  const message = `Eliminar definitivamente la venta de ${sale.units} ${sale.units === 1 ? 'unidad' : 'unidades'} de “${product?.name ?? 'Producto no disponible'}” del ${formatCalendarDate(sale.date)}. Usa esta acción solo para corregir un registro erróneo. ¿Quieres continuar?`;
+  if (!window.confirm(message)) return;
+
+  let latestSales;
+  try {
+    latestSales = readSales();
+    const latestIndex = latestSales.findIndex((item) => item.id === sale.id);
+    if (latestIndex === -1 || JSON.stringify(latestSales[latestIndex]) !== JSON.stringify(sale)) {
+      saleSaveMessage.textContent = 'La venta cambió durante la confirmación. No se ha eliminado.';
+      refreshSales();
+      return;
+    }
+    latestSales.splice(latestIndex, 1);
+    writeSales(latestSales);
+  } catch {
+    saleSaveMessage.textContent = 'No se ha podido eliminar la venta. No se han guardado cambios.';
+    return;
+  }
+  if (editingSaleId === sale.id) finishSaleEditing({ focus: false });
+  else refreshSales();
+  saleSaveMessage.textContent = 'Venta eliminada definitivamente como corrección del registro.';
+  salesDateFilterInput.focus();
+});
+
 function clearPendingBackup(message = '') {
   pendingBackup = null;
   restoreBackupButton.disabled = true;
@@ -1451,6 +1896,7 @@ function renderBackupSummary(summary, fileName) {
   backupSummary.replaceChildren();
   addBackupSummaryItem(summary.ingredients === 1 ? 'ingrediente' : 'ingredientes', summary.ingredients);
   addBackupSummaryItem(summary.products === 1 ? 'producto' : 'productos', summary.products);
+  addBackupSummaryItem(summary.sales === 1 ? 'venta' : 'ventas', summary.sales);
   addBackupSummaryItem('ingredientes archivados', summary.archivedIngredients);
   addBackupSummaryItem('productos archivados', summary.archivedProducts);
   if (summary.productsWithMissingIngredients > 0) {
@@ -1461,29 +1907,42 @@ function renderBackupSummary(summary, fileName) {
       summary.productsWithMissingIngredients,
     );
   }
-  backupMessage.textContent = `“${fileName}” es una copia válida. Revisa el resumen antes de restaurarla.`;
+  if (summary.salesWithMissingProducts > 0) {
+    addBackupSummaryItem(
+      summary.salesWithMissingProducts === 1
+        ? 'venta con producto inexistente'
+        : 'ventas con productos inexistentes',
+      summary.salesWithMissingProducts,
+    );
+  }
+  backupMessage.textContent = summary.clearsSales
+    ? `“${fileName}” es una copia válida de formato 1. No contiene ventas: restaurarla dejará la lista de ventas vacía.`
+    : `“${fileName}” es una copia válida de formato 2. Revisa el resumen antes de restaurarla.`;
 }
 
 function hasPendingInterfaceChanges() {
   const ingredientHasData = editingIngredientId !== null
     || [...form.elements].some((control) => control instanceof HTMLInputElement
       && control.type !== 'checkbox' && control.value.trim() !== '');
-  return ingredientHasData || productFormDirty || editingProductId !== null || simulatorDirty;
+  return ingredientHasData || productFormDirty || editingProductId !== null || simulatorDirty
+    || saleFormDirty || editingSaleId !== null;
 }
 
 exportBackupButton.addEventListener('click', () => {
   let ingredients;
   let products;
+  let sales;
   try {
     ingredients = readIngredients();
     products = readProducts();
+    sales = readSales();
   } catch {
     clearPendingBackup('No se puede exportar: los datos guardados están dañados o no se pueden leer. No se ha generado ningún archivo.');
     return;
   }
 
   try {
-    const backupDocument = createBackupDocument(ingredients, products);
+    const backupDocument = createBackupDocument(ingredients, products, sales);
     const blob = new Blob([`${JSON.stringify(backupDocument, null, 2)}\n`], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -1493,7 +1952,7 @@ exportBackupButton.addEventListener('click', () => {
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
-    backupMessage.textContent = `Copia exportada con ${formatCount(ingredients.length, 'ingrediente')} y ${formatCount(products.length, 'producto')}.`;
+    backupMessage.textContent = `Copia exportada con ${formatCount(ingredients.length, 'ingrediente')}, ${formatCount(products.length, 'producto')} y ${formatCount(sales.length, 'venta')}.`;
   } catch {
     backupMessage.textContent = 'No se ha podido generar o descargar la copia. Los datos guardados no se han modificado.';
   }
@@ -1509,6 +1968,7 @@ importBackupInput.addEventListener('change', async () => {
     expectedRawValues = {
       ingredients: localStorage.getItem(storageKey),
       products: localStorage.getItem(productStorageKey),
+      sales: localStorage.getItem(salesStorageKey),
     };
   } catch {
     clearPendingBackup('El navegador no permite acceder al almacenamiento. No se ha modificado ningún dato.');
@@ -1531,17 +1991,23 @@ importBackupInput.addEventListener('change', async () => {
 restoreBackupButton.addEventListener('click', () => {
   if (!pendingBackup) return;
   const { data, summary, expectedRawValues } = pendingBackup;
-  const isEmpty = summary.ingredients === 0 && summary.products === 0;
+  const isEmpty = summary.ingredients === 0 && summary.products === 0 && summary.sales === 0;
   const missingReferenceWarning = summary.productsWithMissingIngredients > 0
     ? `\n\n${formatCount(summary.productsWithMissingIngredients, 'producto')} quedarán como no calculables porque contienen referencias a ingredientes inexistentes.`
     : '';
   const pendingChangesWarning = hasPendingInterfaceChanges()
-    ? '\n\nLas ediciones o simulaciones sin guardar se descartarán solo si la restauración termina correctamente.'
+    ? '\n\nLas ediciones, ventas pendientes o simulaciones sin guardar se descartarán solo si la restauración termina correctamente.'
+    : '';
+  const legacyWarning = summary.clearsSales
+    ? '\n\nATENCIÓN: esta copia es de formato 1 y no contiene ventas. Al restaurarla se eliminarán todas las ventas locales actuales.'
     : '';
   const emptyWarning = isEmpty
-    ? '\n\nATENCIÓN: esta copia está completamente vacía y eliminará todos los ingredientes y productos actuales.'
+    ? '\n\nATENCIÓN: esta copia está completamente vacía y eliminará todos los ingredientes, productos y ventas actuales.'
     : '';
-  const confirmation = `Restaurar esta copia reemplazará todos los datos actuales por ${formatCount(summary.ingredients, 'ingrediente')} y ${formatCount(summary.products, 'producto')}.${emptyWarning}${missingReferenceWarning}${pendingChangesWarning}\n\n¿Quieres continuar?`;
+  const missingSaleReferenceWarning = summary.salesWithMissingProducts > 0
+    ? `\n\n${formatCount(summary.salesWithMissingProducts, 'venta')} tienen referencias a productos inexistentes. Mantendrán sus importes históricos.`
+    : '';
+  const confirmation = `Restaurar esta copia reemplazará todos los datos actuales por ${formatCount(summary.ingredients, 'ingrediente')}, ${formatCount(summary.products, 'producto')} y ${formatCount(summary.sales, 'venta')}.${emptyWarning}${legacyWarning}${missingReferenceWarning}${missingSaleReferenceWarning}${pendingChangesWarning}\n\n¿Quieres continuar?`;
   if (!window.confirm(confirmation)) {
     backupMessage.textContent = 'Restauración cancelada. La copia validada sigue preparada y no se ha modificado ningún dato.';
     return;
@@ -1551,17 +2017,24 @@ restoreBackupButton.addEventListener('click', () => {
     replaceStoredData(localStorage, storageKeys, data, expectedRawValues);
     const restoredIngredients = readIngredients();
     readProducts();
+    readSales();
     finishEditing({ focus: false });
     finishProductEditing(restoredIngredients, { focus: false });
+    finishSaleEditing({ focus: false });
     saveMessage.textContent = '';
     productSaveMessage.textContent = '';
     importBackupInput.value = '';
-    clearPendingBackup(`Copia restaurada correctamente: ${formatCount(summary.ingredients, 'ingrediente')} y ${formatCount(summary.products, 'producto')}.`);
+    clearPendingBackup(`Copia restaurada correctamente: ${formatCount(summary.ingredients, 'ingrediente')}, ${formatCount(summary.products, 'producto')} y ${formatCount(summary.sales, 'venta')}.`);
     exportBackupButton.focus();
   } catch (error) {
     backupMessage.textContent = error.message;
   }
 });
 
+const today = getLocalDateString();
+saleDateInput.max = today;
+salesDateFilterInput.max = today;
+saleDateInput.value = today;
+salesDateFilterInput.value = today;
 renderStoredIngredients();
 refreshProductFeatures();
