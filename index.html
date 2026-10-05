@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Essenza · Control de costes</title>
+  </head>
+  <body>
+    <main class="container">
+      <header class="page-header">
+        <p class="brand">Essenza<span class="brand-dot" aria-hidden="true">.</span></p>
+        <h1>Control de costes</h1>
+        <p class="intro">Convierte cada compra en decisiones claras: controla ingredientes y calcula el coste de tus productos.</p>
+      </header>
+
+      <div class="workspace">
+      <section class="purchase-section" aria-labelledby="form-title">
+        <h2 id="form-title">Datos de compra</h2>
+        <form id="ingredient-form" novalidate>
+          <div class="field">
+            <label for="ingredient-name">Nombre del ingrediente</label>
+            <input id="ingredient-name" name="name" type="text" placeholder="Por ejemplo: Café en grano" required />
+          </div>
+          <div class="field">
+            <label for="purchase-price">Precio de compra (€)</label>
+            <input id="purchase-price" name="price" type="number" min="0" step="any" inputmode="decimal" placeholder="8" aria-describedby="price-hint" required />
+            <span id="price-hint" class="field-hint">IVA incluido</span>
+          </div>
+          <div class="purchase-row">
+            <div class="field">
+              <label for="purchase-quantity">Cantidad comprada</label>
+              <input id="purchase-quantity" name="quantity" type="number" min="0" step="any" inputmode="decimal" placeholder="1" required />
+            </div>
+            <div class="field">
+              <label for="purchase-unit">Unidad de compra</label>
+              <select id="purchase-unit" name="unit">
+                <option value="kg">Kilogramos (kg)</option>
+                <option value="g">Gramos (g)</option>
+                <option value="l">Litros (l)</option>
+                <option value="ml">Mililitros (ml)</option>
+                <option value="unit">Unidades</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button id="submit-button" type="submit">Guardar ingrediente</button>
+            <button id="cancel-edit-button" class="secondary-button" type="button" hidden>Cancelar edición</button>
+          </div>
+        </form>
+        <p id="save-message" role="status" aria-live="polite" aria-atomic="true"></p>
+        <div class="result" role="status" aria-live="polite" aria-atomic="true">
+          <h2>Coste por unidad base</h2>
+          <p id="unit-cost" class="cost">—</p>
+          <p id="calculation-detail">Completa los datos para calcular el coste.</p>
+        </div>
+      </section>
+      <section class="saved-section" aria-labelledby="saved-title">
+        <h2 id="saved-title">Ingredientes guardados</h2>
+        <p class="section-description">Tus compras, con su coste actual a mano.</p>
+        <label class="archive-toggle" for="show-archived">
+          <input id="show-archived" type="checkbox" />
+          Mostrar archivados
+        </label>
+        <p id="list-message">Todavía no hay ingredientes guardados.</p>
+        <ul id="ingredient-list" class="ingredient-list"></ul>
+      </section>
+      </div>
+
+      <section class="products-area" aria-labelledby="products-title">
+        <div class="section-heading">
+          <div>
+            <h2 id="products-title">Productos y recetas</h2>
+            <p>Cada receta representa una unidad vendida.</p>
+          </div>
+        </div>
+
+        <div class="products-workspace">
+          <section class="product-form-section" aria-labelledby="product-form-title">
+            <h3 id="product-form-title">Nuevo producto</h3>
+            <form id="product-form" novalidate>
+              <div class="field">
+                <label for="product-name">Nombre del producto</label>
+                <input id="product-name" name="productName" type="text" placeholder="Por ejemplo: Bocadillo de bacon" required />
+              </div>
+              <div class="product-details-row">
+                <div class="field">
+                  <label for="product-category">Categoría</label>
+                  <select id="product-category" name="category">
+                    <option value="Bocadillos">Bocadillos</option>
+                    <option value="Hamburguesas">Hamburguesas</option>
+                    <option value="Tapas">Tapas</option>
+                    <option value="Tostadas">Tostadas</option>
+                    <option value="Bebidas">Bebidas</option>
+                    <option value="Bolleria">Bollería</option>
+                    <option value="Otros">Otros</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="sale-price">Precio de venta (€)</label>
+                  <input id="sale-price" name="salePrice" type="number" min="0" step="any" inputmode="decimal" placeholder="5" aria-describedby="sale-price-hint" required />
+                  <span id="sale-price-hint" class="field-hint">Precio final con IVA incluido</span>
+                </div>
+              </div>
+
+              <fieldset class="recipe-builder">
+                <legend>Receta</legend>
+                <p class="field-hint">Indica cuánto utilizas en una unidad vendida.</p>
+                <div id="recipe-lines" class="recipe-lines"></div>
+                <button id="add-recipe-line" class="secondary-button add-line-button" type="button">Añadir ingrediente</button>
+                <p id="recipe-message" class="inline-message" role="status" aria-live="polite"></p>
+              </fieldset>
+
+              <div class="product-result" role="status" aria-live="polite" aria-atomic="true">
+                <h3>Indicadores operativos</h3>
+                <p id="product-calculation-message">Completa el producto y su receta para calcularlos.</p>
+                <dl class="indicator-grid">
+                  <div><dt>Coste</dt><dd id="product-cost">—</dd></div>
+                  <div><dt>Margen</dt><dd id="product-margin">—</dd></div>
+                  <div><dt>Margen %</dt><dd id="product-margin-percent">—</dd></div>
+                  <div><dt>Food cost</dt><dd id="product-food-cost">—</dd></div>
+                </dl>
+                <p class="field-hint">Importes operativos con IVA incluido; no representan beneficio neto.</p>
+              </div>
+
+              <div class="form-actions">
+                <button id="save-product-button" type="submit">Guardar producto</button>
+                <button id="cancel-product-edit-button" class="secondary-button" type="button" hidden>Cancelar edición</button>
+              </div>
+            </form>
+            <p id="product-save-message" class="save-message" role="status" aria-live="polite" aria-atomic="true"></p>
+          </section>
+
+          <section class="product-list-section" aria-labelledby="product-list-title">
+            <h3 id="product-list-title">Productos guardados</h3>
+            <p class="section-description">Los costes se actualizan desde los ingredientes actuales.</p>
+            <label class="archive-toggle" for="show-archived-products">
+              <input id="show-archived-products" type="checkbox" />
+              Mostrar archivados
+            </label>
+            <p id="product-list-message">Todavía no hay productos guardados.</p>
+            <ul id="product-list" class="product-list"></ul>
+          </section>
+        </div>
+
+        <section class="price-simulator" aria-labelledby="simulator-title">
+          <div class="simulator-heading">
+            <div>
+              <h3 id="simulator-title">Simulador de precios</h3>
+              <p>Prueba otro precio sin cambiar el que tienes guardado.</p>
+            </div>
+            <span class="temporary-label">Simulación temporal</span>
+          </div>
+
+          <div class="simulator-controls">
+            <div class="field">
+              <label for="simulator-product">Producto activo</label>
+              <select id="simulator-product">
+                <option value="">Selecciona un producto</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="simulator-price">Precio que quieres probar (€)</label>
+              <input id="simulator-price" type="number" min="0" step="any" inputmode="decimal" placeholder="5,50" aria-describedby="simulator-price-hint" disabled />
+              <span id="simulator-price-hint" class="field-hint">Precio final con IVA incluido. No se guardará automáticamente.</span>
+            </div>
+          </div>
+
+          <p id="simulator-message" class="simulator-message" role="status" aria-live="polite" aria-atomic="true">Selecciona un producto para empezar.</p>
+
+          <div class="price-comparison" aria-label="Comparación del precio actual y el simulado">
+            <article class="comparison-panel current-panel">
+              <p class="comparison-title">Precio actual</p>
+              <p id="current-simulator-price" class="comparison-price">—</p>
+              <dl class="simulator-indicators">
+                <div><dt>Coste</dt><dd id="current-simulator-cost">—</dd></div>
+                <div><dt>Margen</dt><dd id="current-simulator-margin">—</dd></div>
+                <div><dt>Margen %</dt><dd id="current-simulator-margin-percent">—</dd></div>
+                <div><dt>Food cost</dt><dd id="current-simulator-food-cost">—</dd></div>
+              </dl>
+              <div id="current-food-cost-status" class="food-cost-status is-neutral">
+                <span class="status-name">Sin calcular</span>
+                <span class="status-description">Selecciona un producto.</span>
+              </div>
+            </article>
+
+            <article class="comparison-panel simulated-panel">
+              <p class="comparison-title">Precio simulado</p>
+              <p id="simulated-price" class="comparison-price">—</p>
+              <dl class="simulator-indicators">
+                <div><dt>Coste</dt><dd id="simulated-cost">—</dd></div>
+                <div><dt>Margen</dt><dd id="simulated-margin">—</dd></div>
+                <div><dt>Margen %</dt><dd id="simulated-margin-percent">—</dd></div>
+                <div><dt>Food cost</dt><dd id="simulated-food-cost">—</dd></div>
+              </dl>
+              <div id="simulated-food-cost-status" class="food-cost-status is-neutral">
+                <span class="status-name">Sin calcular</span>
+                <span class="status-description">Introduce un precio válido.</span>
+              </div>
+            </article>
+          </div>
+
+          <p class="simulator-disclaimer">El semáforo interpreta únicamente el food cost. Es un indicador operativo con IVA incluido; no representa beneficio neto.</p>
+          <div class="simulator-actions">
+            <button id="apply-simulated-price" type="button" disabled>Aplicar precio al producto</button>
+            <button id="discard-simulation" class="secondary-button" type="button" disabled>Descartar simulación</button>
+          </div>
+        </section>
+      </section>
+
+      <footer class="page-footer">
+        <p class="note">Cálculo operativo con IVA incluido. Los ingredientes se guardan en este navegador y dispositivo, para esta dirección de la aplicación. No hay copia de seguridad ni sincronización; borrar los datos del navegador puede eliminarlos.</p>
+      </footer>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

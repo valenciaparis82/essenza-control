@@ -1,0 +1,13 @@
+{
+  "name": "essenza-control",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "test": "node --test tests/calculations.test.js"
+  },
+  "devDependencies": {
+    "vite": "^8.3.1"
+  }
+}
