@@ -5,6 +5,10 @@ import {
   classifyFoodCost,
   purchaseUnits,
 } from './calculations.js';
+import {
+  createProductComparisonRows,
+  filterAndSortProductComparisonRows,
+} from './product-comparison.js';
 
 function formatNumber(value) {
   // Los valores diminutos usan notación científica para no mostrarse como cero.
@@ -43,6 +47,12 @@ const productSaveMessage = document.querySelector('#product-save-message');
 const productListMessage = document.querySelector('#product-list-message');
 const productList = document.querySelector('#product-list');
 const showArchivedProductsInput = document.querySelector('#show-archived-products');
+const comparisonCategoryInput = document.querySelector('#comparison-category');
+const comparisonSortInput = document.querySelector('#comparison-sort');
+const comparisonDirectionInput = document.querySelector('#comparison-direction');
+const comparisonMessage = document.querySelector('#comparison-message');
+const comparisonTableWrapper = document.querySelector('.comparison-table-wrapper');
+const comparisonBody = document.querySelector('#comparison-body');
 const simulatorProductInput = document.querySelector('#simulator-product');
 const simulatorPriceInput = document.querySelector('#simulator-price');
 const simulatorMessage = document.querySelector('#simulator-message');
@@ -817,6 +827,108 @@ function createIndicatorList(result) {
   return indicators;
 }
 
+function formatProductCategory(category) {
+  return category === 'Bolleria' ? 'Bollería' : category;
+}
+
+function createComparisonCell(label, content, className = '') {
+  const cell = document.createElement('td');
+  cell.dataset.label = label;
+  cell.textContent = content;
+  if (className) cell.className = className;
+  return cell;
+}
+
+function createNotCalculableCell(label) {
+  return createComparisonCell(label, 'No calculable', 'not-calculable-value');
+}
+
+function renderProductComparison(products, ingredients) {
+  comparisonBody.replaceChildren();
+  const rows = createProductComparisonRows(products, ingredients);
+  const visibleRows = filterAndSortProductComparisonRows(rows, {
+    category: comparisonCategoryInput.value,
+    sortBy: comparisonSortInput.value,
+    direction: comparisonDirectionInput.value,
+  });
+
+  if (!rows.length) {
+    comparisonMessage.textContent = 'Necesitas al menos un producto activo para crear la comparativa.';
+    comparisonTableWrapper.hidden = true;
+    return;
+  }
+  if (!visibleRows.length) {
+    comparisonMessage.textContent = 'No hay productos activos en la categoría seleccionada.';
+    comparisonTableWrapper.hidden = true;
+    return;
+  }
+
+  comparisonTableWrapper.hidden = false;
+  comparisonMessage.textContent = visibleRows.length === 1
+    ? 'Mostrando 1 producto activo.'
+    : `Mostrando ${visibleRows.length} productos activos.`;
+
+  for (const row of visibleRows) {
+    const tableRow = document.createElement('tr');
+    const name = document.createElement('th');
+    name.scope = 'row';
+    name.dataset.label = 'Producto';
+    name.textContent = row.product.name;
+    const category = createComparisonCell('Categoría', formatProductCategory(row.product.category));
+    const price = createComparisonCell('Precio', `${formatNumber(row.product.salePrice)} €`, 'numeric-value');
+
+    if (!row.calculable) {
+      tableRow.className = 'is-not-calculable';
+      tableRow.append(
+        name,
+        category,
+        createNotCalculableCell('Coste'),
+        price,
+        createNotCalculableCell('Margen €'),
+        createNotCalculableCell('Margen %'),
+        createNotCalculableCell('Food cost'),
+      );
+      const statusCell = createComparisonCell('Semáforo', 'No calculable', 'not-calculable-value');
+      statusCell.title = row.error;
+      tableRow.append(statusCell);
+    } else {
+      const { indicators, status } = row;
+      const marginAmountClass = indicators.marginAmount < 0 ? 'numeric-value negative-value' : 'numeric-value';
+      const marginPercentClass = indicators.marginPercent < 0 ? 'numeric-value negative-value' : 'numeric-value';
+      const statusCell = document.createElement('td');
+      const statusLabel = document.createElement('span');
+      statusCell.dataset.label = 'Semáforo';
+      statusLabel.className = `comparison-status is-${status.key}`;
+      statusLabel.textContent = status.label;
+      statusLabel.title = status.description;
+      statusCell.append(statusLabel);
+      tableRow.append(
+        name,
+        category,
+        createComparisonCell('Coste', `${formatNumber(indicators.totalCost)} €`, 'numeric-value'),
+        price,
+        createComparisonCell('Margen €', `${formatNumber(indicators.marginAmount)} €`, marginAmountClass),
+        createComparisonCell('Margen %', `${formatNumber(indicators.marginPercent)} %`, marginPercentClass),
+        createComparisonCell('Food cost', `${formatNumber(indicators.foodCostPercent)} %`, 'numeric-value'),
+        statusCell,
+      );
+    }
+    comparisonBody.append(tableRow);
+  }
+}
+
+function refreshProductComparison(knownIngredients = null, knownProducts = null) {
+  try {
+    const ingredients = knownIngredients ?? readIngredients();
+    const products = knownProducts ?? readProducts();
+    renderProductComparison(products, ingredients);
+  } catch {
+    comparisonBody.replaceChildren();
+    comparisonTableWrapper.hidden = true;
+    comparisonMessage.textContent = 'No se puede preparar la comparativa. Los datos pueden estar dañados o el almacenamiento estar bloqueado.';
+  }
+}
+
 function createProductActionButton(text, action, productId, secondary = false) {
   const button = document.createElement('button');
   button.type = 'button';
@@ -852,7 +964,7 @@ function renderProducts(products, ingredients) {
     const result = calculateProductIndicators(product, ingredients);
     const isArchived = product.archived === true;
     category.className = 'product-category';
-    category.textContent = product.category === 'Bolleria' ? 'Bollería' : product.category;
+    category.textContent = formatProductCategory(product.category);
     title.textContent = product.name;
     salePrice.className = 'product-sale-price';
     salePrice.textContent = `Precio de venta: ${formatNumber(product.salePrice)} € (IVA incluido)`;
@@ -970,6 +1082,7 @@ function refreshProductFeatures(knownIngredients = null) {
   updateAddRecipeLineButton(ingredients);
   updateProductCalculation(ingredients);
   renderStoredProducts(ingredients);
+  refreshProductComparison(ingredients);
   refreshPriceSimulator(ingredients);
 }
 
@@ -1054,6 +1167,10 @@ showArchivedProductsInput.addEventListener('change', () => {
     productListMessage.textContent = 'No se pueden recuperar los productos. Los datos pueden estar dañados o el almacenamiento estar bloqueado. No se han sobrescrito.';
   }
 });
+
+for (const control of [comparisonCategoryInput, comparisonSortInput, comparisonDirectionInput]) {
+  control.addEventListener('change', () => refreshProductComparison());
+}
 
 simulatorProductInput.addEventListener('change', () => {
   const requestedProductId = simulatorProductInput.value;
@@ -1185,6 +1302,7 @@ applySimulatedPriceButton.addEventListener('click', () => {
 
   const updatedProduct = latestProducts[latestIndex];
   renderProducts(latestProducts, latestIngredients);
+  renderProductComparison(latestProducts, latestIngredients);
   loadSimulatorProduct(updatedProduct, latestIngredients);
   simulatorMessage.textContent = `Precio de ${updatedProduct.name} actualizado en este navegador.`;
 });
@@ -1250,6 +1368,7 @@ productList.addEventListener('click', (event) => {
     finishProductEditing(ingredients, { focus: false });
   } else {
     renderProducts(products, ingredients);
+    renderProductComparison(products, ingredients);
     refreshPriceSimulator(ingredients);
   }
   productSaveMessage.textContent = action === 'archive'

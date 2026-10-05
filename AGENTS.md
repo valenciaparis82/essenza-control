@@ -196,6 +196,16 @@ No crear archivos, módulos o abstracciones antes de que hagan falta.
 
 \- El semáforo es una orientación operativa basada solo en food cost con IVA incluido, no un indicador de beneficio neto.
 
+\- La comparativa muestra solo productos activos y recalcula sus indicadores desde los ingredientes y precios actuales; no guarda valores derivados.
+
+\- La comparativa permite filtrar una sola categoría y ordenar por producto, categoría, coste, precio, margen en euros, margen porcentual, food cost o semáforo.
+
+\- La comparativa se ordena inicialmente por food cost de mayor a menor y usa los valores completos sin redondear para ordenar.
+
+\- Los productos no calculables siguen visibles al final de la comparativa y deben identificarse como no calculables, sin inventar indicadores.
+
+\- El semáforo visual debe acompañar siempre el color con texto.
+
 \- Los datos históricos futuros deberán conservar precios y costes del momento.
 
 

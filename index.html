@@ -143,6 +143,73 @@
           </section>
         </div>
 
+        <section class="profitability-comparison" aria-labelledby="comparison-title">
+          <div class="comparison-heading">
+            <div>
+              <h3 id="comparison-title">Comparativa de rentabilidad</h3>
+              <p>Compara los indicadores actuales de tus productos activos.</p>
+            </div>
+            <span class="current-data-label">Costes actuales</span>
+          </div>
+
+          <div class="comparison-controls">
+            <div class="field">
+              <label for="comparison-category">Categoría</label>
+              <select id="comparison-category">
+                <option value="all">Todas las categorías</option>
+                <option value="Bocadillos">Bocadillos</option>
+                <option value="Hamburguesas">Hamburguesas</option>
+                <option value="Tapas">Tapas</option>
+                <option value="Tostadas">Tostadas</option>
+                <option value="Bebidas">Bebidas</option>
+                <option value="Bolleria">Bollería</option>
+                <option value="Otros">Otros</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="comparison-sort">Ordenar por</label>
+              <select id="comparison-sort">
+                <option value="product">Producto</option>
+                <option value="category">Categoría</option>
+                <option value="cost">Coste</option>
+                <option value="price">Precio</option>
+                <option value="marginAmount">Margen €</option>
+                <option value="marginPercent">Margen %</option>
+                <option value="foodCost" selected>Food cost</option>
+                <option value="status">Semáforo</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="comparison-direction">Dirección</label>
+              <select id="comparison-direction">
+                <option value="desc" selected>Mayor a menor</option>
+                <option value="asc">Menor a mayor</option>
+              </select>
+            </div>
+          </div>
+
+          <p id="comparison-message" class="comparison-message" role="status" aria-live="polite"></p>
+          <div class="comparison-table-wrapper">
+            <table class="comparison-table">
+              <caption>Indicadores operativos con IVA incluido de los productos activos</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Producto</th>
+                  <th scope="col">Categoría</th>
+                  <th scope="col">Coste</th>
+                  <th scope="col">Precio</th>
+                  <th scope="col">Margen €</th>
+                  <th scope="col">Margen %</th>
+                  <th scope="col">Food cost</th>
+                  <th scope="col">Semáforo</th>
+                </tr>
+              </thead>
+              <tbody id="comparison-body"></tbody>
+            </table>
+          </div>
+          <p class="comparison-disclaimer">Indicadores operativos con IVA incluido. El semáforo interpreta únicamente el food cost y no representa beneficio neto.</p>
+        </section>
+
         <section class="price-simulator" aria-labelledby="simulator-title">
           <div class="simulator-heading">
             <div>
