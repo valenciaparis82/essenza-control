@@ -7,12 +7,62 @@
     <title>Essenza · Control de costes</title>
   </head>
   <body>
-    <main class="container">
-      <header class="page-header">
-        <p class="brand">Essenza<span class="brand-dot" aria-hidden="true">.</span></p>
-        <h1>Control de costes</h1>
-        <p class="intro">Convierte cada compra en decisiones claras: controla ingredientes y calcula el coste de tus productos.</p>
-      </header>
+    <div class="app-shell">
+      <aside class="app-sidebar">
+        <div class="sidebar-header">
+          <p class="brand">Essenza<span class="brand-dot" aria-hidden="true">.</span></p>
+          <button id="mobile-navigation-toggle" class="mobile-navigation-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation">
+            Abrir menú
+          </button>
+        </div>
+        <p class="sidebar-description">Control de costes para tomar decisiones claras.</p>
+        <p class="mobile-current-section">Sección: <strong id="mobile-current-section">Inicio</strong></p>
+        <nav id="primary-navigation" class="primary-navigation" aria-label="Secciones principales">
+          <a class="navigation-link" href="#inicio" data-section-link="inicio" data-navigation-link>Inicio</a>
+          <a class="navigation-link" href="#ingredientes" data-section-link="ingredientes" data-navigation-link>Ingredientes</a>
+          <a class="navigation-link" href="#productos" data-section-link="productos" data-navigation-link>Productos</a>
+          <a class="navigation-link" href="#ventas" data-section-link="ventas" data-navigation-link>Ventas</a>
+          <a class="navigation-link" href="#datos" data-section-link="datos" data-navigation-link>Datos</a>
+        </nav>
+      </aside>
+
+      <main class="app-content">
+      <section id="inicio" class="section-panel home-section" data-section-panel="inicio" aria-labelledby="home-title">
+        <header class="page-header">
+          <h1 id="home-title" data-section-title tabindex="-1">Control de costes</h1>
+          <p class="intro">Convierte cada compra en decisiones claras: controla ingredientes y calcula el coste de tus productos.</p>
+        </header>
+        <div class="quick-access" aria-labelledby="quick-access-title">
+          <div class="quick-access-heading">
+            <h2 id="quick-access-title">Accesos rápidos</h2>
+            <p>Elige el área en la que quieres trabajar.</p>
+          </div>
+          <div class="quick-access-grid">
+            <a class="quick-access-link" href="#ingredientes" data-section-link="ingredientes">
+              <strong>Ingredientes</strong>
+              <span>Registra compras y consulta costes unitarios.</span>
+            </a>
+            <a class="quick-access-link" href="#productos" data-section-link="productos">
+              <strong>Productos</strong>
+              <span>Gestiona recetas, márgenes y precios.</span>
+            </a>
+            <a class="quick-access-link" href="#ventas" data-section-link="ventas">
+              <strong>Ventas</strong>
+              <span>Registra ventas y revisa el resumen diario.</span>
+            </a>
+            <a class="quick-access-link" href="#datos" data-section-link="datos">
+              <strong>Datos</strong>
+              <span>Exporta o restaura una copia de seguridad.</span>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <section id="ingredientes" class="section-panel ingredients-area" data-section-panel="ingredientes" aria-labelledby="ingredients-title" hidden>
+        <div class="panel-heading">
+          <h1 id="ingredients-title" data-section-title tabindex="-1">Ingredientes</h1>
+          <p>Registra tus compras y consulta su coste en gramos, mililitros o unidades.</p>
+        </div>
 
       <div class="workspace">
       <section class="purchase-section" aria-labelledby="form-title">
@@ -66,18 +116,19 @@
         <ul id="ingredient-list" class="ingredient-list"></ul>
       </section>
       </div>
+      </section>
 
-      <section class="products-area" aria-labelledby="products-title">
+      <section id="productos" class="section-panel products-area" data-section-panel="productos" aria-labelledby="products-title" hidden>
         <div class="section-heading">
           <div>
-            <h2 id="products-title">Productos y recetas</h2>
+            <h1 id="products-title" data-section-title tabindex="-1">Productos y recetas</h1>
             <p>Cada receta representa una unidad vendida.</p>
           </div>
         </div>
 
         <div class="products-workspace">
           <section class="product-form-section" aria-labelledby="product-form-title">
-            <h3 id="product-form-title">Nuevo producto</h3>
+            <h2 id="product-form-title">Nuevo producto</h2>
             <form id="product-form" novalidate>
               <div class="field">
                 <label for="product-name">Nombre del producto</label>
@@ -132,7 +183,7 @@
           </section>
 
           <section class="product-list-section" aria-labelledby="product-list-title">
-            <h3 id="product-list-title">Productos guardados</h3>
+            <h2 id="product-list-title">Productos guardados</h2>
             <p class="section-description">Los costes se actualizan desde los ingredientes actuales.</p>
             <label class="archive-toggle" for="show-archived-products">
               <input id="show-archived-products" type="checkbox" />
@@ -146,7 +197,7 @@
         <section class="profitability-comparison" aria-labelledby="comparison-title">
           <div class="comparison-heading">
             <div>
-              <h3 id="comparison-title">Comparativa de rentabilidad</h3>
+              <h2 id="comparison-title">Comparativa de rentabilidad</h2>
               <p>Compara los indicadores actuales de tus productos activos.</p>
             </div>
             <span class="current-data-label">Costes actuales</span>
@@ -213,7 +264,7 @@
         <section class="price-simulator" aria-labelledby="simulator-title">
           <div class="simulator-heading">
             <div>
-              <h3 id="simulator-title">Simulador de precios</h3>
+              <h2 id="simulator-title">Simulador de precios</h2>
               <p>Prueba otro precio sin cambiar el que tienes guardado.</p>
             </div>
             <span class="temporary-label">Simulación temporal</span>
@@ -275,10 +326,10 @@
         </section>
       </section>
 
-      <section class="sales-section" aria-labelledby="sales-title">
+      <section id="ventas" class="section-panel sales-section" data-section-panel="ventas" aria-labelledby="sales-title" hidden>
         <div class="sales-heading">
           <div>
-            <h2 id="sales-title">Ventas diarias</h2>
+            <h1 id="sales-title" data-section-title tabindex="-1">Ventas diarias</h1>
             <p>Registra unidades vendidas y conserva el precio y el coste existentes en ese momento.</p>
           </div>
           <span class="historical-data-label">Datos históricos</span>
@@ -286,7 +337,7 @@
 
         <div class="sales-workspace">
           <section class="sale-form-section" aria-labelledby="sale-form-title">
-            <h3 id="sale-form-title">Registrar venta</h3>
+            <h2 id="sale-form-title">Registrar venta</h2>
             <form id="sale-form" novalidate>
               <div class="sale-fields">
                 <div class="field">
@@ -327,7 +378,7 @@
           <section class="daily-sales-section" aria-labelledby="daily-sales-title">
             <div class="daily-sales-heading">
               <div>
-                <h3 id="daily-sales-title">Resumen del día</h3>
+                <h2 id="daily-sales-title">Resumen del día</h2>
                 <p>Consulta únicamente una fecha cada vez.</p>
               </div>
               <div class="field daily-date-field">
@@ -365,6 +416,11 @@
         </div>
       </section>
 
+      <section id="datos" class="section-panel data-area" data-section-panel="datos" aria-labelledby="data-title" hidden>
+        <div class="panel-heading">
+          <h1 id="data-title" data-section-title tabindex="-1">Datos y copias de seguridad</h1>
+          <p>Guarda una copia manual o restaura datos previamente validados.</p>
+        </div>
       <section class="backup-section" aria-labelledby="backup-title">
         <div class="backup-heading">
           <div>
@@ -395,11 +451,13 @@
         <p id="backup-message" class="backup-message" role="status" aria-live="polite" aria-atomic="true">Selecciona una acción. Ninguna importación modifica datos antes de validarse y confirmarse.</p>
         <ul id="backup-summary" class="backup-summary" aria-label="Resumen de la copia seleccionada"></ul>
       </section>
+      </section>
 
       <footer class="page-footer">
         <p class="note">Cálculo operativo con IVA incluido. Los datos se guardan en este navegador y dispositivo, para esta dirección de la aplicación. Puedes crear copias manuales en JSON; no hay sincronización y borrar los datos del navegador puede eliminarlos.</p>
       </footer>
-    </main>
+      </main>
+    </div>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

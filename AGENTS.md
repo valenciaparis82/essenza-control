@@ -248,6 +248,20 @@ No crear archivos, módulos o abstracciones antes de que hagan falta.
 
 \- Las copias son manuales y no se deben presentar como sincronización, historial automático ni respaldo remoto.
 
+\- La interfaz se organiza en las secciones internas Inicio, Ingredientes, Productos, Ventas y Datos dentro de una sola aplicación.
+
+\- La navegación usa los hashes `#inicio`, `#ingredientes`, `#productos`, `#ventas` y `#datos`; un hash vacío o desconocido abre Inicio.
+
+\- Navegar solo muestra u oculta paneles existentes: no recarga la página, no reconstruye formularios, no descarta cambios pendientes y no escribe en `localStorage`.
+
+\- En ordenador la navegación se muestra en una barra lateral y en móvil mediante un menú desplegable accesible, siempre con sección activa y foco visibles.
+
+\- En escritorio, los formularios cortos se colocan encima de los listados largos y estos aprovechan todo el ancho disponible.
+
+\- Los listados de ingredientes y productos usan filas compactas en escritorio y tarjetas en pantallas estrechas.
+
+\- Las tablas complejas deben convertirse en tarjetas antes de provocar un desplazamiento horizontal prolongado.
+
 
 
 \## Fórmulas

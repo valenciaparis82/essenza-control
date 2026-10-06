@@ -5,7 +5,7 @@
 - Productos completos: recetas, indicadores, edición, archivado, restauración y persistencia local.
 - Comparativa, simulador temporal y copias de seguridad completos.
 - Ventas diarias completas: alta, resumen por fecha, edición y eliminación confirmada.
-- Interfaz responsive verde bosque/ocre; revisada a 375 px.
+- Interfaz optimizada: formularios sobre listados a ancho completo, filas/tablas compactas en escritorio y tarjetas responsive.
 - HTML, CSS y JavaScript con Vite; sin framework, backend, autenticación ni sincronización.
 - Inicio: `npm run dev`. Pruebas: `npm test`.
 
@@ -34,14 +34,16 @@
 - `src/product-comparison.js` prepara la comparativa sin DOM ni almacenamiento.
 - `src/data-validation.js` valida ingredientes, productos y ventas.
 - `src/backup.js` gestiona copias 1/2 y restauración transaccional.
-- `src/main.js` coordina interfaz y persistencia; pruebas con `node:test`.
+- `src/main.js` coordina interfaz, persistencia y navegación por hash sin escribir estado de navegación.
+- Secciones por hash: Inicio, Ingredientes, Productos, Ventas y Datos; los paneles solo se ocultan y conservan todos los estados pendientes.
 
 ## Comprobaciones
-- `npm test`: 27/27; `node --check` y `git diff --check` correctos.
+- `npm test`: 27/27; build de Vite, `node --check` y `git diff --check` correctos.
 - Navegador aislado: alta repetida, resumen, edición, eliminación e histórico comprobados.
 - Tras duplicar el coste del ingrediente, ventas anteriores conservaron precio y coste guardados.
 - Importación/restauración de formatos 1 y 2 comprobada en lógica y navegador.
-- Chrome DevTools a 375 px: sección de 343 px sin desbordamiento y sin errores ni advertencias JavaScript.
+- Chrome DevTools: 1440, 1280, 1024, 800, 768, 480 y 375 px sin desbordamiento; listas largas y acciones comprobadas.
+- Accesibilidad Lighthouse 100/100 incluso con archivados visibles; sin errores de consola.
 
 ## Fuera de alcance
 - Sin informes semanales/mensuales, gráficos, gastos, beneficio neto, devoluciones ni dashboard.

@@ -38,6 +38,94 @@ function formatNumber(value) {
   }).format(value);
 }
 
+const sectionNames = {
+  inicio: 'Inicio',
+  ingredientes: 'Ingredientes',
+  productos: 'Productos',
+  ventas: 'Ventas',
+  datos: 'Datos',
+};
+const sectionPanels = [...document.querySelectorAll('[data-section-panel]')];
+const sectionLinks = [...document.querySelectorAll('[data-section-link]')];
+const navigationLinks = [...document.querySelectorAll('[data-navigation-link]')];
+const mobileNavigationToggle = document.querySelector('#mobile-navigation-toggle');
+const primaryNavigation = document.querySelector('#primary-navigation');
+const mobileCurrentSection = document.querySelector('#mobile-current-section');
+
+function getSectionFromHash() {
+  const requestedSection = window.location.hash.slice(1).toLowerCase();
+  return Object.hasOwn(sectionNames, requestedSection) ? requestedSection : 'inicio';
+}
+
+function closeMobileNavigation({ returnFocus = false } = {}) {
+  primaryNavigation.classList.remove('is-open');
+  mobileNavigationToggle.setAttribute('aria-expanded', 'false');
+  mobileNavigationToggle.textContent = 'Abrir menú';
+  if (returnFocus) mobileNavigationToggle.focus();
+}
+
+function activateSection(sectionId, { moveFocus = false } = {}) {
+  const activeSectionId = Object.hasOwn(sectionNames, sectionId) ? sectionId : 'inicio';
+  for (const panel of sectionPanels) {
+    panel.hidden = panel.dataset.sectionPanel !== activeSectionId;
+  }
+  for (const link of navigationLinks) {
+    if (link.dataset.sectionLink === activeSectionId) {
+      link.setAttribute('aria-current', 'page');
+    } else {
+      link.removeAttribute('aria-current');
+    }
+  }
+  mobileCurrentSection.textContent = sectionNames[activeSectionId];
+
+  if (moveFocus) {
+    const activePanel = sectionPanels.find((panel) => panel.dataset.sectionPanel === activeSectionId);
+    activePanel?.querySelector('[data-section-title]')?.focus({ preventScroll: true });
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }
+}
+
+function initializeNavigation() {
+  const activeSectionId = getSectionFromHash();
+  activateSection(activeSectionId);
+  if (window.location.hash !== `#${activeSectionId}`) {
+    window.history.replaceState(null, '', `#${activeSectionId}`);
+  }
+
+  mobileNavigationToggle.addEventListener('click', () => {
+    const willOpen = mobileNavigationToggle.getAttribute('aria-expanded') !== 'true';
+    primaryNavigation.classList.toggle('is-open', willOpen);
+    mobileNavigationToggle.setAttribute('aria-expanded', String(willOpen));
+    mobileNavigationToggle.textContent = willOpen ? 'Cerrar menú' : 'Abrir menú';
+  });
+
+  for (const link of sectionLinks) {
+    link.addEventListener('click', (event) => {
+      closeMobileNavigation();
+      if (getSectionFromHash() === link.dataset.sectionLink) {
+        event.preventDefault();
+        activateSection(link.dataset.sectionLink, { moveFocus: true });
+      }
+    });
+  }
+
+  window.addEventListener('hashchange', () => {
+    const requestedHash = window.location.hash.slice(1).toLowerCase();
+    const activeSectionId = getSectionFromHash();
+    activateSection(activeSectionId, { moveFocus: true });
+    closeMobileNavigation();
+    if (requestedHash !== activeSectionId) {
+      window.history.replaceState(null, '', `#${activeSectionId}`);
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && mobileNavigationToggle.getAttribute('aria-expanded') === 'true') {
+      closeMobileNavigation({ returnFocus: true });
+    }
+  });
+}
+
 const form = document.querySelector('#ingredient-form');
 const formTitle = document.querySelector('#form-title');
 const submitButton = document.querySelector('#submit-button');
@@ -978,7 +1066,7 @@ function renderProducts(products, ingredients) {
   for (const product of visibleProducts) {
     const item = document.createElement('li');
     const category = document.createElement('span');
-    const title = document.createElement('h4');
+    const title = document.createElement('h3');
     const salePrice = document.createElement('p');
     const recipeTitle = document.createElement('p');
     const recipe = document.createElement('ul');
@@ -2032,6 +2120,7 @@ restoreBackupButton.addEventListener('click', () => {
 });
 
 const today = getLocalDateString();
+initializeNavigation();
 saleDateInput.max = today;
 salesDateFilterInput.max = today;
 saleDateInput.value = today;
