@@ -35,6 +35,7 @@ import {
   SUGGESTED_EXPENSE_CATEGORIES,
 } from './expenses.js';
 import { calculateOperatingResults } from './results.js';
+import { calculateMonthlyBreakEven } from './break-even.js';
 
 function formatNumber(value) {
   // Los valores diminutos usan notación científica para no mostrarse como cero.
@@ -53,6 +54,7 @@ const sectionNames = {
   ventas: 'Ventas',
   gastos: 'Gastos',
   resultados: 'Resultados',
+  equilibrio: 'Punto de equilibrio',
   datos: 'Datos',
 };
 const sectionPanels = [...document.querySelectorAll('[data-section-panel]')];
@@ -225,6 +227,21 @@ const resultsProductCostOutput = document.querySelector('#results-product-cost')
 const resultsGrossMarginOutput = document.querySelector('#results-gross-margin');
 const resultsOperatingExpensesOutput = document.querySelector('#results-operating-expenses');
 const resultsOperatingResultOutput = document.querySelector('#results-operating-result');
+const breakEvenMonthInput = document.querySelector('#break-even-month');
+const breakEvenPeriodWarning = document.querySelector('#break-even-period-warning');
+const breakEvenMessage = document.querySelector('#break-even-message');
+const breakEvenRevenueOutput = document.querySelector('#break-even-revenue');
+const breakEvenProductCostOutput = document.querySelector('#break-even-product-cost');
+const breakEvenVariableExpensesOutput = document.querySelector('#break-even-variable-expenses');
+const breakEvenContributionOutput = document.querySelector('#break-even-contribution');
+const breakEvenContributionPercentOutput = document.querySelector('#break-even-contribution-percent');
+const breakEvenFixedExpensesOutput = document.querySelector('#break-even-fixed-expenses');
+const breakEvenTargetOutput = document.querySelector('#break-even-target');
+const breakEvenActualRevenueOutput = document.querySelector('#break-even-actual-revenue');
+const breakEvenDifferenceLabel = document.querySelector('#break-even-difference-label');
+const breakEvenDifferenceOutput = document.querySelector('#break-even-difference');
+const breakEvenAttainmentOutput = document.querySelector('#break-even-attainment');
+const breakEvenStatus = document.querySelector('#break-even-status');
 const exportBackupButton = document.querySelector('#export-backup');
 const importBackupInput = document.querySelector('#import-backup-file');
 const restoreBackupButton = document.querySelector('#restore-backup');
@@ -1822,6 +1839,7 @@ function refreshSales(knownProducts = null, knownIngredients = null) {
     updateSalePreview(products, ingredients);
     renderDailySales(sales, products);
     refreshResults();
+    refreshBreakEven();
     return true;
   } catch {
     resetSalePreview('No se pueden recuperar los datos necesarios para registrar ventas.');
@@ -1830,6 +1848,7 @@ function refreshSales(knownProducts = null, knownIngredients = null) {
     salesListMessage.hidden = false;
     salesListMessage.textContent = 'No se pueden recuperar las ventas. Los datos pueden estar dañados o el almacenamiento estar bloqueado. No se han sobrescrito.';
     refreshResults();
+    refreshBreakEven();
     return false;
   }
 }
@@ -2112,6 +2131,7 @@ function refreshExpenses() {
   try {
     renderDailyExpenses(readExpenses());
     refreshResults();
+    refreshBreakEven();
     return true;
   } catch {
     expensesBody.replaceChildren();
@@ -2119,6 +2139,7 @@ function refreshExpenses() {
     expensesListMessage.hidden = false;
     expensesListMessage.textContent = 'No se pueden recuperar los gastos. Los datos pueden estar dañados o el almacenamiento estar bloqueado. No se han sobrescrito.';
     refreshResults();
+    refreshBreakEven();
     return false;
   }
 }
@@ -2323,6 +2344,119 @@ resultsPeriodInput.addEventListener('change', updateResultsPeriod);
 resultsDayInput.addEventListener('change', refreshResults);
 resultsMonthInput.addEventListener('change', refreshResults);
 
+function resetBreakEvenOutputs() {
+  for (const output of [
+    breakEvenRevenueOutput,
+    breakEvenProductCostOutput,
+    breakEvenVariableExpensesOutput,
+    breakEvenContributionOutput,
+    breakEvenContributionPercentOutput,
+    breakEvenFixedExpensesOutput,
+    breakEvenTargetOutput,
+    breakEvenActualRevenueOutput,
+    breakEvenDifferenceOutput,
+    breakEvenAttainmentOutput,
+  ]) {
+    output.textContent = '—';
+    output.classList.remove('negative-value');
+  }
+  breakEvenDifferenceLabel.textContent = 'Diferencia';
+  breakEvenStatus.className = 'break-even-status is-neutral';
+  breakEvenStatus.textContent = 'No se puede determinar el estado.';
+}
+
+function formatDeduction(value) {
+  return value === 0 ? '0 €' : `−${formatNumber(value)} €`;
+}
+
+function updateBreakEvenPeriodWarning(month) {
+  const currentMonth = getLocalDateString().slice(0, 7);
+  breakEvenPeriodWarning.textContent = month === currentMonth
+    ? 'Mes en curso. El cálculo utiliza únicamente las ventas y los gastos registrados hasta este momento. Los gastos todavía no registrados pueden modificar el punto de equilibrio; no se proyectan ventas ni gastos hasta final de mes.'
+    : 'El cálculo utiliza únicamente los datos registrados. En un mes finalizado será más representativo si se han registrado todos sus gastos.';
+}
+
+function renderBreakEven(sales, expenses) {
+  const month = breakEvenMonthInput.value;
+  updateBreakEvenPeriodWarning(month);
+  const summary = calculateMonthlyBreakEven(sales, expenses, month);
+  if (summary.error) {
+    resetBreakEvenOutputs();
+    breakEvenMessage.textContent = `No se puede calcular el punto de equilibrio: ${summary.error}`;
+    return;
+  }
+
+  breakEvenRevenueOutput.textContent = `${formatNumber(summary.revenue)} €`;
+  breakEvenProductCostOutput.textContent = formatDeduction(summary.productCost);
+  breakEvenVariableExpensesOutput.textContent = formatDeduction(summary.variableExpenses);
+  breakEvenContributionOutput.textContent = `${formatNumber(summary.contributionMargin)} €`;
+  breakEvenContributionOutput.classList.toggle('negative-value', summary.contributionMargin < 0);
+  breakEvenContributionPercentOutput.textContent = summary.contributionMarginPercent === null
+    ? 'No calculable'
+    : `${formatNumber(summary.contributionMarginPercent)} %`;
+  breakEvenContributionPercentOutput.classList.toggle(
+    'negative-value',
+    summary.contributionMarginPercent !== null && summary.contributionMarginPercent < 0,
+  );
+  breakEvenFixedExpensesOutput.textContent = `${formatNumber(summary.fixedExpenses)} €`;
+  breakEvenActualRevenueOutput.textContent = `${formatNumber(summary.actualRevenue)} €`;
+
+  const periodLabel = formatCalendarMonth(month);
+  const saleLabel = summary.saleCount === 1 ? 'venta' : 'ventas';
+  const expenseLabel = summary.expenseCount === 1 ? 'gasto' : 'gastos';
+  breakEvenMessage.textContent = summary.saleCount === 0 && summary.expenseCount === 0
+    ? `No hay ventas ni gastos registrados en ${periodLabel}. No se puede obtener un margen de contribución.`
+    : `Datos de ${periodLabel}: ${summary.saleCount} ${saleLabel} y ${summary.expenseCount} ${expenseLabel}. El margen de contribución refleja únicamente los registros de este mes.`;
+
+  if (summary.status === 'not-calculable') {
+    breakEvenTargetOutput.textContent = 'No calculable';
+    breakEvenDifferenceLabel.textContent = 'Diferencia';
+    breakEvenDifferenceOutput.textContent = 'No calculable';
+    breakEvenAttainmentOutput.textContent = 'No aplicable';
+    breakEvenStatus.className = 'break-even-status is-warning';
+    breakEvenStatus.textContent = summary.reason === 'no-revenue'
+      ? 'No calculable: no hay facturación registrada para obtener el margen de contribución porcentual.'
+      : 'No existe un punto de equilibrio alcanzable con el margen de contribución observado.';
+    return;
+  }
+
+  breakEvenTargetOutput.textContent = `${formatNumber(summary.breakEvenRevenue)} €`;
+  breakEvenAttainmentOutput.textContent = summary.attainmentPercent === null
+    ? 'No aplicable'
+    : `${formatNumber(summary.attainmentPercent)} %`;
+
+  if (summary.status === 'below') {
+    breakEvenDifferenceLabel.textContent = 'Falta para el equilibrio';
+    breakEvenDifferenceOutput.textContent = `${formatNumber(Math.abs(summary.difference))} €`;
+    breakEvenStatus.className = 'break-even-status is-pending';
+    breakEvenStatus.textContent = 'El punto de equilibrio todavía no se ha alcanzado.';
+  } else if (summary.status === 'exceeded') {
+    breakEvenDifferenceLabel.textContent = 'Superado en';
+    breakEvenDifferenceOutput.textContent = `${formatNumber(summary.difference)} €`;
+    breakEvenStatus.className = 'break-even-status is-reached';
+    breakEvenStatus.textContent = 'El punto de equilibrio se ha superado según los datos registrados.';
+  } else {
+    breakEvenDifferenceLabel.textContent = 'Diferencia';
+    breakEvenDifferenceOutput.textContent = '0 €';
+    breakEvenStatus.className = 'break-even-status is-reached';
+    breakEvenStatus.textContent = 'El punto de equilibrio se ha alcanzado exactamente según los datos registrados.';
+  }
+}
+
+function refreshBreakEven() {
+  try {
+    renderBreakEven(readSales(), readExpenses());
+    return true;
+  } catch {
+    updateBreakEvenPeriodWarning(breakEvenMonthInput.value);
+    resetBreakEvenOutputs();
+    breakEvenMessage.textContent = 'No se pueden recuperar las ventas o los gastos. Los datos pueden estar dañados o el almacenamiento estar bloqueado. No se han sobrescrito.';
+    return false;
+  }
+}
+
+breakEvenMonthInput.addEventListener('change', refreshBreakEven);
+
 function clearPendingBackup(message = '') {
   pendingBackup = null;
   restoreBackupButton.disabled = true;
@@ -2503,12 +2637,14 @@ expenseDateInput.max = today;
 expensesDateFilterInput.max = today;
 resultsDayInput.max = today;
 resultsMonthInput.max = today.slice(0, 7);
+breakEvenMonthInput.max = today.slice(0, 7);
 saleDateInput.value = today;
 salesDateFilterInput.value = today;
 expenseDateInput.value = today;
 expensesDateFilterInput.value = today;
 resultsDayInput.value = today;
 resultsMonthInput.value = today.slice(0, 7);
+breakEvenMonthInput.value = today.slice(0, 7);
 for (const category of SUGGESTED_EXPENSE_CATEGORIES) {
   const option = document.createElement('option');
   option.value = category;

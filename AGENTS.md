@@ -32,6 +32,8 @@ Construir una aplicación web responsive para la cafetería Essenza que permita 
 
 \- resultados operativos diarios y mensuales
 
+\- punto de equilibrio estimado según datos registrados
+
 
 
 Más adelante podrá ampliarse con:
@@ -39,8 +41,6 @@ Más adelante podrá ampliarse con:
 
 
 \- beneficio contable o fiscal
-
-\- punto de equilibrio
 
 \- merma
 

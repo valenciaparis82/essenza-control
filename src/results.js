@@ -22,7 +22,8 @@ export function calculateOperatingResults(sales, expenses, { period, value }) {
 
   let revenue = 0;
   let productCost = 0;
-  let operatingExpenses = 0;
+  let fixedExpenses = 0;
+  let variableExpenses = 0;
   let saleCount = 0;
   let expenseCount = 0;
 
@@ -46,16 +47,18 @@ export function calculateOperatingResults(sales, expenses, { period, value }) {
       return { error: 'No se pueden calcular los resultados porque hay un gasto inválido.' };
     }
     if (!matchesPeriod(expense.date, period, value)) continue;
-    operatingExpenses += expense.amount;
+    if (expense.type === 'fixed') fixedExpenses += expense.amount;
+    else variableExpenses += expense.amount;
     expenseCount += 1;
-    if (!Number.isFinite(operatingExpenses)) {
+    if (![fixedExpenses, variableExpenses].every(Number.isFinite)) {
       return { error: 'Los resultados del periodo son demasiado grandes para calcularlos.' };
     }
   }
 
+  const operatingExpenses = fixedExpenses + variableExpenses;
   const grossMargin = revenue - productCost;
   const operatingResult = grossMargin - operatingExpenses;
-  if (![grossMargin, operatingResult].every(Number.isFinite)) {
+  if (![operatingExpenses, grossMargin, operatingResult].every(Number.isFinite)) {
     return { error: 'Los resultados del periodo son demasiado grandes para calcularlos.' };
   }
 
@@ -64,6 +67,8 @@ export function calculateOperatingResults(sales, expenses, { period, value }) {
     productCost,
     grossMargin,
     operatingExpenses,
+    fixedExpenses,
+    variableExpenses,
     operatingResult,
     saleCount,
     expenseCount,

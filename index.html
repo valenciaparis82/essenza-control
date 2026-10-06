@@ -24,6 +24,7 @@
           <a class="navigation-link" href="#ventas" data-section-link="ventas" data-navigation-link>Ventas</a>
           <a class="navigation-link" href="#gastos" data-section-link="gastos" data-navigation-link>Gastos</a>
           <a class="navigation-link" href="#resultados" data-section-link="resultados" data-navigation-link>Resultados</a>
+          <a class="navigation-link" href="#equilibrio" data-section-link="equilibrio" data-navigation-link>Punto de equilibrio</a>
           <a class="navigation-link" href="#datos" data-section-link="datos" data-navigation-link>Datos</a>
         </nav>
       </aside>
@@ -59,6 +60,10 @@
             <a class="quick-access-link" href="#resultados" data-section-link="resultados">
               <strong>Resultados</strong>
               <span>Combina ventas y gastos por día o mes.</span>
+            </a>
+            <a class="quick-access-link" href="#equilibrio" data-section-link="equilibrio">
+              <strong>Punto de equilibrio</strong>
+              <span>Compara la facturación mensual con los costes registrados.</span>
             </a>
             <a class="quick-access-link" href="#datos" data-section-link="datos">
               <strong>Datos</strong>
@@ -578,6 +583,68 @@
           <div class="results-explanation">
             <p><strong>Cómo se interpreta:</strong> es una estimación operativa basada en los importes registrados con IVA incluido. No representa beneficio neto, resultado contable ni resultado fiscal.</p>
             <p><strong>Imputación de gastos:</strong> cada gasto se asigna completamente a la fecha en que fue registrado, sin prorratearlo. Por ello, un gasto periódico grande puede distorsionar un día concreto; el resultado mensual suele ser más representativo.</p>
+          </div>
+        </section>
+      </section>
+
+      <section id="equilibrio" class="section-panel break-even-section" data-section-panel="equilibrio" aria-labelledby="break-even-title" hidden>
+        <div class="break-even-heading">
+          <div>
+            <h1 id="break-even-title" data-section-title tabindex="-1">Punto de equilibrio</h1>
+            <p>Estima la facturación necesaria para cubrir los costes a partir del margen de contribución del mes.</p>
+          </div>
+          <span class="derived-data-label">Cálculo derivado</span>
+        </div>
+
+        <section class="break-even-summary" aria-labelledby="break-even-summary-title">
+          <div class="break-even-summary-heading">
+            <div>
+              <h2 id="break-even-summary-title">Punto de equilibrio estimado según datos registrados</h2>
+              <p>La consulta usa un mes natural y no guarda ninguno de estos indicadores.</p>
+            </div>
+            <div class="field break-even-month-field">
+              <label for="break-even-month">Mes consultado</label>
+              <input id="break-even-month" type="month" />
+            </div>
+          </div>
+
+          <p id="break-even-period-warning" class="break-even-period-warning"></p>
+          <p id="break-even-message" class="break-even-message" role="status" aria-live="polite" aria-atomic="true"></p>
+
+          <div class="break-even-groups">
+            <section class="break-even-group contribution-group" aria-labelledby="contribution-title">
+              <h3 id="contribution-title">Margen de contribución</h3>
+              <dl class="break-even-values">
+                <div><dt>Facturación del mes</dt><dd id="break-even-revenue">0 €</dd></div>
+                <div><dt>Coste de producto vendido</dt><dd id="break-even-product-cost">0 €</dd></div>
+                <div><dt>Gastos variables</dt><dd id="break-even-variable-expenses">0 €</dd></div>
+                <div><dt>Margen de contribución</dt><dd id="break-even-contribution">0 €</dd></div>
+                <div><dt>Margen de contribución</dt><dd id="break-even-contribution-percent">—</dd></div>
+              </dl>
+            </section>
+
+            <section class="break-even-group target-group" aria-labelledby="estimated-balance-title">
+              <h3 id="estimated-balance-title">Equilibrio estimado</h3>
+              <dl class="break-even-values">
+                <div><dt>Gastos fijos registrados</dt><dd id="break-even-fixed-expenses">0 €</dd></div>
+                <div class="break-even-main-value"><dt>Facturación necesaria</dt><dd id="break-even-target">—</dd></div>
+              </dl>
+            </section>
+
+            <section class="break-even-group tracking-group" aria-labelledby="balance-tracking-title">
+              <h3 id="balance-tracking-title">Seguimiento</h3>
+              <p id="break-even-status" class="break-even-status is-neutral">Todavía no se puede determinar el estado.</p>
+              <dl class="break-even-values">
+                <div><dt>Facturación real acumulada</dt><dd id="break-even-actual-revenue">0 €</dd></div>
+                <div><dt id="break-even-difference-label">Diferencia</dt><dd id="break-even-difference">—</dd></div>
+                <div><dt>Porcentaje alcanzado</dt><dd id="break-even-attainment">—</dd></div>
+              </dl>
+            </section>
+          </div>
+
+          <div class="break-even-explanation">
+            <p><strong>Cómo se calcula:</strong> al coste histórico de producto vendido se suman únicamente los gastos marcados como variables. Los gastos fijos quedan fuera del margen de contribución y determinan cuánto debe cubrirse.</p>
+            <p><strong>Evita duplicar costes:</strong> no registres como gasto operativo los ingredientes incluidos en recetas. Su coste ya está incorporado en las ventas históricas.</p>
           </div>
         </section>
       </section>

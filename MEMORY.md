@@ -6,6 +6,7 @@
 - Comparativa, simulador temporal, ventas diarias y copias de seguridad completos.
 - Gastos completos: alta, edición, cancelación, eliminación confirmada, ordenación y resumen diario.
 - Resultados completos: cinco totales derivados para un día o mes natural, sin persistencia.
+- Punto de equilibrio estimado según datos registrados: cálculo mensual derivado, reutiliza estructuras de ventas y gastos, muestra margen de contribución, gastos fijos/variables, equilibrio no alcanzado/alcanzado/superado, y advertencia si el mes está incompleto.
 - Interfaz responsive con formularios sobre listados, tablas compactas y tarjetas móviles.
 - HTML, CSS y JavaScript con Vite; inicio: `npm run dev`; pruebas: `npm test`.
 
@@ -32,19 +33,22 @@
 - `src/calculations.js` centraliza costes de ingredientes y productos.
 - `src/sales.js` valida ventas y calcula sus valores históricos y resúmenes diarios.
 - `src/expenses.js` valida, ordena y resume gastos; `src/date-utils.js` comparte las fechas.
-- `src/results.js` combina ventas y gastos por día/mes sin DOM ni almacenamiento.
+- `src/results.js` combina ventas y gastos por día/mes sin DOM ni almacenamiento; amplía su salida para devolver gastos fijos y variables por separado.
+- `src/break-even.js` lógica pura del punto de equilibrio mensual, reutiliza resultados.js y devuelve margen de contribución, gastos fijos, equilibrio estimado.
 - `src/data-validation.js` valida las cuatro colecciones; `src/backup.js` gestiona copias 1/2/3.
 - `src/main.js` coordina interfaz, localStorage y navegación sin descartar estados pendientes.
-- Hashes: Inicio, Ingredientes, Productos, Ventas, Gastos, Resultados y Datos.
+- Hashes: Inicio, Ingredientes, Productos, Ventas, Gastos, Resultados, Punto de equilibrio y Datos.
 
 ## Comprobaciones
-- `npm test`: 40/40; incluye Resultados y formatos de copia 1/2/3.
+- `npm test`: 48/48; incluye Resultados, Punto de equilibrio y formatos de copia 1/2/3.
 - Build de Vite, `node --check` y `git diff --check` correctos.
 - Resultados comprobado con ventas, gastos, ambos, vacío, negativos y límites de mes/año; editar, eliminar y restaurar formato 1 recalculan.
-- Carga directa `#resultados`, Atrás/Adelante y responsive comprobados sin desbordamiento.
+- Punto de equilibrio comprobado con margen positivo, cero y negativo; equilibrio no alcanzado, exacto y superado; cambio de mes y año; Atrás/Adelante y responsive.
 - Resultados no crea claves ni escribe derivados; solo existen las cuatro colecciones actuales.
 
 ## Fuera de alcance
 - Sin gráficos, desglose diario mensual, prorrateo ni desglose fijo/variable en Resultados.
-- Sin punto de equilibrio, dashboard, impuestos, amortizaciones ni beneficio contable o fiscal.
+- No generar gastos futuros ni recurrencias automáticas.
+- Sin punto de equilibrio dashboard ni beneficio contable o fiscal.
 - Sin inventario, proveedores, PWA, backend ni sincronización.
+- El punto de equilibrio es una consulta y cálculo derivado; no guarda resultados en localStorage ni inventa datos.

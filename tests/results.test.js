@@ -23,6 +23,8 @@ test('calcula un día combinando ventas históricas y gastos sin depender del pr
     productCost: 2.5,
     grossMargin: 7.5,
     operatingExpenses: 3,
+    fixedExpenses: 0,
+    variableExpenses: 3,
     operatingResult: 4.5,
     saleCount: 1,
     expenseCount: 1,
@@ -47,6 +49,8 @@ test('devuelve ceros para un periodo vacío', () => {
     productCost: 0,
     grossMargin: 0,
     operatingExpenses: 0,
+    fixedExpenses: 0,
+    variableExpenses: 0,
     operatingResult: 0,
     saleCount: 0,
     expenseCount: 0,
@@ -59,6 +63,8 @@ test('calcula un mes natural sin incluir los meses contiguos ni mezclar años', 
   assert.equal(result.productCost, 6);
   assert.equal(result.grossMargin, 8);
   assert.equal(result.operatingExpenses, 7);
+  assert.equal(result.fixedExpenses, 5);
+  assert.equal(result.variableExpenses, 2);
   assert.equal(result.operatingResult, 1);
   assert.equal(result.saleCount, 2);
   assert.equal(result.expenseCount, 2);
