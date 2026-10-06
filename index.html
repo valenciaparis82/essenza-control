@@ -22,6 +22,7 @@
           <a class="navigation-link" href="#ingredientes" data-section-link="ingredientes" data-navigation-link>Ingredientes</a>
           <a class="navigation-link" href="#productos" data-section-link="productos" data-navigation-link>Productos</a>
           <a class="navigation-link" href="#ventas" data-section-link="ventas" data-navigation-link>Ventas</a>
+          <a class="navigation-link" href="#gastos" data-section-link="gastos" data-navigation-link>Gastos</a>
           <a class="navigation-link" href="#datos" data-section-link="datos" data-navigation-link>Datos</a>
         </nav>
       </aside>
@@ -49,6 +50,10 @@
             <a class="quick-access-link" href="#ventas" data-section-link="ventas">
               <strong>Ventas</strong>
               <span>Registra ventas y revisa el resumen diario.</span>
+            </a>
+            <a class="quick-access-link" href="#gastos" data-section-link="gastos">
+              <strong>Gastos</strong>
+              <span>Registra gastos operativos y consulta el total diario.</span>
             </a>
             <a class="quick-access-link" href="#datos" data-section-link="datos">
               <strong>Datos</strong>
@@ -416,6 +421,112 @@
         </div>
       </section>
 
+      <section id="gastos" class="section-panel expenses-section" data-section-panel="gastos" aria-labelledby="expenses-title" hidden>
+        <div class="expenses-heading">
+          <div>
+            <h1 id="expenses-title" data-section-title tabindex="-1">Gastos</h1>
+            <p>Registra los gastos operativos reales de la cafetería y consulta el total de cada día.</p>
+          </div>
+          <span class="operating-expense-label">Gastos operativos</span>
+        </div>
+
+        <div class="expenses-workspace">
+          <section class="expense-form-section" aria-labelledby="expense-form-title">
+            <h2 id="expense-form-title">Registrar gasto</h2>
+            <p class="expense-scope-warning"><strong>Evita duplicar costes:</strong> no registres aquí ingredientes utilizados en recetas. Su coste ya está incluido en las ventas.</p>
+            <form id="expense-form" novalidate>
+              <div class="expense-fields">
+                <div class="field">
+                  <label for="expense-date">Fecha</label>
+                  <input id="expense-date" name="expenseDate" type="date" autocomplete="off" required />
+                </div>
+                <div class="field">
+                  <label for="expense-category">Categoría</label>
+                  <input id="expense-category" name="expenseCategory" type="text" list="expense-category-suggestions" placeholder="Por ejemplo: Alquiler" autocomplete="off" required />
+                  <datalist id="expense-category-suggestions"></datalist>
+                  <span class="field-hint">Puedes elegir una sugerencia o escribir otra categoría.</span>
+                </div>
+                <div class="field expense-description-field">
+                  <label for="expense-description">Concepto o descripción</label>
+                  <input id="expense-description" name="expenseDescription" type="text" placeholder="Por ejemplo: Alquiler del local - octubre" autocomplete="off" required />
+                </div>
+                <div class="field">
+                  <label for="expense-amount">Importe (€)</label>
+                  <input id="expense-amount" name="expenseAmount" type="number" min="0" step="any" inputmode="decimal" placeholder="850" autocomplete="off" aria-describedby="expense-amount-hint" required />
+                  <span id="expense-amount-hint" class="field-hint">Importe real pagado, mayor que cero.</span>
+                </div>
+                <div class="field">
+                  <label for="expense-type">Tipo de gasto</label>
+                  <select id="expense-type" name="expenseType" autocomplete="off" required>
+                    <option value="fixed">Fijo</option>
+                    <option value="variable">Variable</option>
+                  </select>
+                  <span class="field-hint">Clasificarlo no crea recurrencias automáticas.</span>
+                </div>
+              </div>
+              <div class="form-actions">
+                <button id="save-expense-button" type="submit">Guardar gasto</button>
+                <button id="cancel-expense-edit-button" class="secondary-button" type="button" hidden>Cancelar edición</button>
+              </div>
+            </form>
+            <p id="expense-save-message" class="save-message" role="status" aria-live="polite" aria-atomic="true"></p>
+          </section>
+
+          <section class="daily-expenses-section" aria-labelledby="daily-expenses-title">
+            <div class="daily-expenses-heading">
+              <div>
+                <h2 id="daily-expenses-title">Resumen del día</h2>
+                <p>Consulta únicamente una fecha cada vez.</p>
+              </div>
+              <div class="expense-list-controls">
+                <div class="field daily-date-field">
+                  <label for="expenses-date-filter">Día consultado</label>
+                  <input id="expenses-date-filter" type="date" />
+                </div>
+                <div class="field">
+                  <label for="expenses-sort">Ordenar por</label>
+                  <select id="expenses-sort">
+                    <option value="amount" selected>Importe</option>
+                    <option value="category">Categoría</option>
+                    <option value="description">Concepto</option>
+                    <option value="type">Tipo</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="expenses-sort-direction">Dirección</label>
+                  <select id="expenses-sort-direction">
+                    <option value="desc" selected>Mayor a menor</option>
+                    <option value="asc">Menor a mayor</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <dl class="daily-expense-totals">
+              <div><dt>Número de gastos</dt><dd id="daily-expense-count">0</dd></div>
+              <div><dt>Total de gastos</dt><dd id="daily-expense-total">0 €</dd></div>
+            </dl>
+
+            <p id="expenses-list-message" class="expenses-list-message" role="status" aria-live="polite">Todavía no hay gastos registrados para este día.</p>
+            <div id="expenses-table-wrapper" class="expenses-table-wrapper" hidden>
+              <table class="expenses-table">
+                <caption>Gastos operativos de la fecha seleccionada</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Categoría</th>
+                    <th scope="col">Concepto</th>
+                    <th scope="col">Tipo</th>
+                    <th scope="col">Importe</th>
+                    <th scope="col">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="expenses-body"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </section>
+
       <section id="datos" class="section-panel data-area" data-section-panel="datos" aria-labelledby="data-title" hidden>
         <div class="panel-heading">
           <h1 id="data-title" data-section-title tabindex="-1">Datos y copias de seguridad</h1>
@@ -425,15 +536,15 @@
         <div class="backup-heading">
           <div>
             <h2 id="backup-title">Copia de seguridad</h2>
-            <p>Guarda ingredientes, productos, recetas y ventas en un archivo JSON o restaura una copia validada.</p>
+            <p>Guarda ingredientes, productos, recetas, ventas y gastos en un archivo JSON o restaura una copia validada.</p>
           </div>
-          <span class="backup-version">Formato 2</span>
+          <span class="backup-version">Formato 3</span>
         </div>
 
         <div class="backup-actions-grid">
           <article class="backup-action">
             <h3>Guardar una copia</h3>
-            <p>Descarga todos los datos actuales, incluidas las ventas históricas. El archivo es manual y no sincroniza dispositivos.</p>
+            <p>Descarga todos los datos actuales, incluidas las ventas históricas y los gastos. El archivo es manual y no sincroniza dispositivos.</p>
             <button id="export-backup" type="button">Exportar copia JSON</button>
           </article>
 

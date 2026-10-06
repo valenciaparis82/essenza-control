@@ -1,8 +1,14 @@
-import { validateDataSet, validateIngredients, validateProducts } from './data-validation.js';
+import {
+  validateDataSet,
+  validateIngredients,
+  validateProducts,
+  validateSales,
+} from './data-validation.js';
 
 export const BACKUP_APPLICATION = 'essenza-control';
-export const BACKUP_FORMAT_VERSION = 2;
-const LEGACY_BACKUP_FORMAT_VERSION = 1;
+export const BACKUP_FORMAT_VERSION = 3;
+const FIRST_BACKUP_FORMAT_VERSION = 1;
+const SALES_BACKUP_FORMAT_VERSION = 2;
 
 function hasExactKeys(value, expectedKeys) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -47,8 +53,19 @@ function canonicalSale(sale) {
   };
 }
 
-export function createBackupDocument(ingredients, products, sales, exportedAt = new Date()) {
-  validateDataSet({ ingredients, products, sales });
+function canonicalExpense(expense) {
+  return {
+    id: expense.id,
+    date: expense.date,
+    category: expense.category,
+    description: expense.description,
+    amount: expense.amount,
+    type: expense.type,
+  };
+}
+
+export function createBackupDocument(ingredients, products, sales, expenses, exportedAt = new Date()) {
+  validateDataSet({ ingredients, products, sales, expenses });
   const document = {
     application: BACKUP_APPLICATION,
     formatVersion: BACKUP_FORMAT_VERSION,
@@ -57,6 +74,7 @@ export function createBackupDocument(ingredients, products, sales, exportedAt = 
       ingredients: ingredients.map(canonicalIngredient),
       products: products.map(canonicalProduct),
       sales: sales.map(canonicalSale),
+      expenses: expenses.map(canonicalExpense),
     },
   };
   validateBackupDocument(document);
@@ -78,17 +96,24 @@ export function validateBackupDocument(document) {
   if (document.application !== BACKUP_APPLICATION) {
     throw new Error('El archivo no pertenece a Essenza Control.');
   }
-  if (![LEGACY_BACKUP_FORMAT_VERSION, BACKUP_FORMAT_VERSION].includes(document.formatVersion)) {
-    throw new Error(`La versión de la copia no es compatible. Esta aplicación admite las versiones ${LEGACY_BACKUP_FORMAT_VERSION} y ${BACKUP_FORMAT_VERSION}.`);
+  if (![FIRST_BACKUP_FORMAT_VERSION, SALES_BACKUP_FORMAT_VERSION, BACKUP_FORMAT_VERSION].includes(document.formatVersion)) {
+    throw new Error(`La versión de la copia no es compatible. Esta aplicación admite las versiones ${FIRST_BACKUP_FORMAT_VERSION}, ${SALES_BACKUP_FORMAT_VERSION} y ${BACKUP_FORMAT_VERSION}.`);
   }
   validateExportDate(document.exportedAt);
 
-  if (document.formatVersion === LEGACY_BACKUP_FORMAT_VERSION) {
+  if (document.formatVersion === FIRST_BACKUP_FORMAT_VERSION) {
     if (!hasExactKeys(document.data, ['ingredients', 'products'])) {
       throw new Error('La estructura de datos de la copia no es válida.');
     }
     validateIngredients(document.data.ingredients, { strict: true });
     validateProducts(document.data.products, { strict: true });
+  } else if (document.formatVersion === SALES_BACKUP_FORMAT_VERSION) {
+    if (!hasExactKeys(document.data, ['ingredients', 'products', 'sales'])) {
+      throw new Error('La estructura de datos de la copia no es válida.');
+    }
+    validateIngredients(document.data.ingredients, { strict: true });
+    validateProducts(document.data.products, { strict: true });
+    validateSales(document.data.sales, { strict: true });
   } else {
     validateDataSet(document.data, { strict: true });
   }
@@ -103,11 +128,13 @@ export function parseBackupText(text) {
     throw new Error('El archivo no contiene un JSON válido.');
   }
   validateBackupDocument(document);
-  const isLegacy = document.formatVersion === LEGACY_BACKUP_FORMAT_VERSION;
+  const hasSales = document.formatVersion >= SALES_BACKUP_FORMAT_VERSION;
+  const hasExpenses = document.formatVersion >= BACKUP_FORMAT_VERSION;
   const data = {
     ingredients: document.data.ingredients,
     products: document.data.products,
-    sales: isLegacy ? [] : document.data.sales,
+    sales: hasSales ? document.data.sales : [],
+    expenses: hasExpenses ? document.data.expenses : [],
   };
   const ingredientIds = new Set(data.ingredients.map((ingredient) => ingredient.id));
   const productIds = new Set(data.products.map((product) => product.id));
@@ -128,7 +155,9 @@ export function parseBackupText(text) {
       productsWithMissingIngredients,
       sales: data.sales.length,
       salesWithMissingProducts,
-      clearsSales: isLegacy,
+      expenses: data.expenses.length,
+      clearsSales: !hasSales,
+      clearsExpenses: !hasExpenses,
     },
   };
 }
@@ -140,7 +169,7 @@ function restoreRawValue(storage, key, value) {
 
 export function replaceStoredData(storage, keys, data, expectedRawValues) {
   validateDataSet(data, { strict: true });
-  const names = ['ingredients', 'products', 'sales'];
+  const names = ['ingredients', 'products', 'sales', 'expenses'];
   const currentValues = Object.fromEntries(names.map((name) => [name, storage.getItem(keys[name])]));
   if (names.some((name) => currentValues[name] !== expectedRawValues[name])) {
     throw new Error('Los datos actuales han cambiado desde que seleccionaste la copia. Vuelve a elegir el archivo para evitar sobrescribir esos cambios.');

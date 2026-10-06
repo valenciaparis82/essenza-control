@@ -15,6 +15,7 @@ import {
   validateIngredients,
   validateProducts,
   validateSales,
+  validateExpenses,
 } from './data-validation.js';
 import {
   createBackupDocument,
@@ -27,6 +28,12 @@ import {
   getSaleValidationError,
   summarizeSalesByDate,
 } from './sales.js';
+import {
+  getExpenseValidationError,
+  sortExpenses,
+  summarizeExpensesByDate,
+  SUGGESTED_EXPENSE_CATEGORIES,
+} from './expenses.js';
 
 function formatNumber(value) {
   // Los valores diminutos usan notación científica para no mostrarse como cero.
@@ -43,6 +50,7 @@ const sectionNames = {
   ingredientes: 'Ingredientes',
   productos: 'Productos',
   ventas: 'Ventas',
+  gastos: 'Gastos',
   datos: 'Datos',
 };
 const sectionPanels = [...document.querySelectorAll('[data-section-panel]')];
@@ -185,6 +193,25 @@ const dailyMarginOutput = document.querySelector('#daily-margin');
 const salesListMessage = document.querySelector('#sales-list-message');
 const salesTableWrapper = document.querySelector('#sales-table-wrapper');
 const salesBody = document.querySelector('#sales-body');
+const expenseForm = document.querySelector('#expense-form');
+const expenseFormTitle = document.querySelector('#expense-form-title');
+const expenseDateInput = document.querySelector('#expense-date');
+const expenseCategoryInput = document.querySelector('#expense-category');
+const expenseDescriptionInput = document.querySelector('#expense-description');
+const expenseAmountInput = document.querySelector('#expense-amount');
+const expenseTypeInput = document.querySelector('#expense-type');
+const expenseCategorySuggestions = document.querySelector('#expense-category-suggestions');
+const saveExpenseButton = document.querySelector('#save-expense-button');
+const cancelExpenseEditButton = document.querySelector('#cancel-expense-edit-button');
+const expenseSaveMessage = document.querySelector('#expense-save-message');
+const expensesDateFilterInput = document.querySelector('#expenses-date-filter');
+const expensesSortInput = document.querySelector('#expenses-sort');
+const expensesSortDirectionInput = document.querySelector('#expenses-sort-direction');
+const dailyExpenseCountOutput = document.querySelector('#daily-expense-count');
+const dailyExpenseTotalOutput = document.querySelector('#daily-expense-total');
+const expensesListMessage = document.querySelector('#expenses-list-message');
+const expensesTableWrapper = document.querySelector('#expenses-table-wrapper');
+const expensesBody = document.querySelector('#expenses-body');
 const exportBackupButton = document.querySelector('#export-backup');
 const importBackupInput = document.querySelector('#import-backup-file');
 const restoreBackupButton = document.querySelector('#restore-backup');
@@ -208,8 +235,14 @@ const simulatedOutputs = {
 };
 const productStorageKey = 'essenza.products';
 const salesStorageKey = 'essenza.sales';
+const expensesStorageKey = 'essenza.expenses';
 const productCategories = new Set(PRODUCT_CATEGORIES);
-const storageKeys = { ingredients: storageKey, products: productStorageKey, sales: salesStorageKey };
+const storageKeys = {
+  ingredients: storageKey,
+  products: productStorageKey,
+  sales: salesStorageKey,
+  expenses: expensesStorageKey,
+};
 let editingIngredientId = null;
 let editingOriginalData = null;
 let editingProductId = null;
@@ -223,6 +256,9 @@ let editingSaleId = null;
 let editingOriginalSaleData = null;
 let saleFormDirty = false;
 let salePreviewProductSignature = null;
+let editingExpenseId = null;
+let editingOriginalExpenseData = null;
+let expenseFormDirty = false;
 let pendingBackup = null;
 
 function getStoredData(ingredient) {
@@ -270,6 +306,17 @@ function readSales() {
 
 function writeSales(sales) {
   localStorage.setItem(salesStorageKey, JSON.stringify(sales));
+}
+
+function readExpenses() {
+  const stored = localStorage.getItem(expensesStorageKey);
+  if (stored === null) return [];
+  const expenses = JSON.parse(stored);
+  return validateExpenses(expenses);
+}
+
+function writeExpenses(expenses) {
+  localStorage.setItem(expensesStorageKey, JSON.stringify(expenses));
 }
 
 function getStoredProductData(product) {
@@ -1961,6 +2008,236 @@ salesBody.addEventListener('click', (event) => {
   salesDateFilterInput.focus();
 });
 
+function getExpenseFormData() {
+  return {
+    id: editingExpenseId ?? crypto.randomUUID(),
+    date: expenseDateInput.value,
+    category: expenseCategoryInput.value.trim(),
+    description: expenseDescriptionInput.value.trim(),
+    amount: expenseAmountInput.valueAsNumber,
+    type: expenseTypeInput.value,
+  };
+}
+
+function createExpenseTableCell(label, content, className = '') {
+  const cell = document.createElement('td');
+  cell.dataset.label = label;
+  if (content instanceof Node) cell.append(content);
+  else cell.textContent = content;
+  if (className) cell.className = className;
+  return cell;
+}
+
+function renderDailyExpenses(expenses) {
+  expensesBody.replaceChildren();
+  const selectedDate = expensesDateFilterInput.value || getLocalDateString();
+  expensesDateFilterInput.value = selectedDate;
+  const summary = summarizeExpensesByDate(expenses, selectedDate);
+  if (summary.error) {
+    dailyExpenseCountOutput.textContent = '—';
+    dailyExpenseTotalOutput.textContent = '—';
+    expensesTableWrapper.hidden = true;
+    expensesListMessage.hidden = false;
+    expensesListMessage.textContent = `No se puede calcular el resumen: ${summary.error}`;
+    return;
+  }
+
+  dailyExpenseCountOutput.textContent = formatNumber(summary.count);
+  dailyExpenseTotalOutput.textContent = `${formatNumber(summary.totalAmount)} €`;
+  expensesListMessage.hidden = summary.records.length > 0;
+  expensesTableWrapper.hidden = summary.records.length === 0;
+  expensesListMessage.textContent = `Todavía no hay gastos registrados para el ${formatCalendarDate(selectedDate)}.`;
+
+  const sortedExpenses = sortExpenses(summary.records, {
+    sortBy: expensesSortInput.value,
+    direction: expensesSortDirectionInput.value,
+  });
+  for (const expense of sortedExpenses) {
+    const row = document.createElement('tr');
+    const category = document.createElement('th');
+    category.scope = 'row';
+    category.dataset.label = 'Categoría';
+    category.textContent = expense.category;
+    const typeLabel = document.createElement('span');
+    typeLabel.className = 'expense-type-label';
+    typeLabel.textContent = expense.type === 'fixed' ? 'Fijo' : 'Variable';
+    const actions = document.createElement('div');
+    actions.className = 'expense-actions';
+    const editButton = document.createElement('button');
+    editButton.type = 'button';
+    editButton.textContent = 'Editar';
+    editButton.dataset.expenseAction = 'edit';
+    editButton.dataset.expenseId = expense.id;
+    const deleteButton = document.createElement('button');
+    deleteButton.type = 'button';
+    deleteButton.textContent = 'Eliminar';
+    deleteButton.className = 'secondary-button';
+    deleteButton.dataset.expenseAction = 'delete';
+    deleteButton.dataset.expenseId = expense.id;
+    actions.append(editButton, deleteButton);
+    row.append(
+      category,
+      createExpenseTableCell('Concepto', expense.description),
+      createExpenseTableCell('Tipo', typeLabel),
+      createExpenseTableCell('Importe', `${formatNumber(expense.amount)} €`, 'numeric-value'),
+      createExpenseTableCell('Acciones', actions),
+    );
+    expensesBody.append(row);
+  }
+}
+
+function refreshExpenses() {
+  try {
+    renderDailyExpenses(readExpenses());
+    return true;
+  } catch {
+    expensesBody.replaceChildren();
+    expensesTableWrapper.hidden = true;
+    expensesListMessage.hidden = false;
+    expensesListMessage.textContent = 'No se pueden recuperar los gastos. Los datos pueden estar dañados o el almacenamiento estar bloqueado. No se han sobrescrito.';
+    return false;
+  }
+}
+
+function finishExpenseEditing({ focus = true } = {}) {
+  editingExpenseId = null;
+  editingOriginalExpenseData = null;
+  expenseFormDirty = false;
+  expenseForm.reset();
+  expenseDateInput.value = getLocalDateString();
+  expenseFormTitle.textContent = 'Registrar gasto';
+  saveExpenseButton.textContent = 'Guardar gasto';
+  cancelExpenseEditButton.hidden = true;
+  refreshExpenses();
+  expenseFormDirty = false;
+  if (focus) expenseDateInput.focus();
+}
+
+function startEditingExpense(expense) {
+  editingExpenseId = expense.id;
+  editingOriginalExpenseData = { ...expense };
+  expenseDateInput.value = expense.date;
+  expenseCategoryInput.value = expense.category;
+  expenseDescriptionInput.value = expense.description;
+  expenseAmountInput.value = expense.amount;
+  expenseTypeInput.value = expense.type;
+  expenseFormTitle.textContent = 'Editar gasto';
+  saveExpenseButton.textContent = 'Guardar cambios';
+  cancelExpenseEditButton.hidden = false;
+  expenseFormDirty = false;
+  expenseSaveMessage.textContent = `Editando “${expense.description}”.`;
+  expenseForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  expenseDateInput.focus();
+}
+
+expenseForm.addEventListener('input', () => {
+  expenseFormDirty = true;
+});
+
+expenseForm.addEventListener('change', () => {
+  expenseFormDirty = true;
+});
+
+expenseForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const expense = getExpenseFormData();
+  const validationError = getExpenseValidationError(expense, { today: getLocalDateString() });
+  if (validationError) {
+    expenseSaveMessage.textContent = validationError;
+    return;
+  }
+
+  let expenses;
+  try {
+    expenses = readExpenses();
+  } catch {
+    expenseSaveMessage.textContent = 'No se pueden leer los gastos guardados. No se ha sobrescrito ningún dato.';
+    return;
+  }
+
+  if (editingExpenseId !== null) {
+    const index = expenses.findIndex((saved) => saved.id === editingExpenseId);
+    if (index === -1 || JSON.stringify(expenses[index]) !== JSON.stringify(editingOriginalExpenseData)) {
+      expenseSaveMessage.textContent = 'Este gasto ha cambiado desde otra pestaña. Cancela la edición y vuelve a abrirlo.';
+      refreshExpenses();
+      return;
+    }
+    expenses[index] = expense;
+  } else {
+    expenses.unshift(expense);
+  }
+
+  try {
+    writeExpenses(expenses);
+  } catch {
+    expenseSaveMessage.textContent = 'No se ha podido guardar el gasto. El formulario se conserva y no se han realizado cambios.';
+    return;
+  }
+  const wasEditing = editingExpenseId !== null;
+  expensesDateFilterInput.value = expense.date;
+  finishExpenseEditing({ focus: false });
+  expenseSaveMessage.textContent = wasEditing
+    ? 'Cambios del gasto guardados en este navegador.'
+    : 'Gasto guardado en este navegador.';
+  saveExpenseButton.focus();
+});
+
+cancelExpenseEditButton.addEventListener('click', () => {
+  finishExpenseEditing();
+  expenseSaveMessage.textContent = 'Edición cancelada. No se ha modificado el gasto.';
+});
+
+expensesDateFilterInput.addEventListener('change', refreshExpenses);
+expensesSortInput.addEventListener('change', refreshExpenses);
+expensesSortDirectionInput.addEventListener('change', refreshExpenses);
+
+expensesBody.addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-expense-action]');
+  if (!button) return;
+  const { expenseAction, expenseId } = button.dataset;
+  let expenses;
+  try {
+    expenses = readExpenses();
+  } catch {
+    expenseSaveMessage.textContent = 'No se pueden leer los gastos guardados. No se ha modificado ningún dato.';
+    return;
+  }
+  const expense = expenses.find((item) => item.id === expenseId);
+  if (!expense) {
+    expenseSaveMessage.textContent = 'El gasto ya no está disponible. Se ha actualizado el resumen.';
+    refreshExpenses();
+    return;
+  }
+
+  if (expenseAction === 'edit') {
+    if (expenseFormDirty && !window.confirm('Hay datos de otro gasto sin guardar. ¿Quieres descartarlos?')) return;
+    startEditingExpense(expense);
+    return;
+  }
+  if (expenseAction !== 'delete') return;
+  const message = `Eliminar definitivamente “${expense.description}”, por ${formatNumber(expense.amount)} €, del ${formatCalendarDate(expense.date)}. Usa esta acción solo para corregir un registro erróneo. ¿Quieres continuar?`;
+  if (!window.confirm(message)) return;
+
+  try {
+    const latestExpenses = readExpenses();
+    const latestIndex = latestExpenses.findIndex((item) => item.id === expense.id);
+    if (latestIndex === -1 || JSON.stringify(latestExpenses[latestIndex]) !== JSON.stringify(expense)) {
+      expenseSaveMessage.textContent = 'El gasto cambió durante la confirmación. No se ha eliminado.';
+      refreshExpenses();
+      return;
+    }
+    latestExpenses.splice(latestIndex, 1);
+    writeExpenses(latestExpenses);
+  } catch {
+    expenseSaveMessage.textContent = 'No se ha podido eliminar el gasto. No se han guardado cambios.';
+    return;
+  }
+  if (editingExpenseId === expense.id) finishExpenseEditing({ focus: false });
+  else refreshExpenses();
+  expenseSaveMessage.textContent = 'Gasto eliminado definitivamente como corrección del registro.';
+  expensesDateFilterInput.focus();
+});
+
 function clearPendingBackup(message = '') {
   pendingBackup = null;
   restoreBackupButton.disabled = true;
@@ -1985,6 +2262,7 @@ function renderBackupSummary(summary, fileName) {
   addBackupSummaryItem(summary.ingredients === 1 ? 'ingrediente' : 'ingredientes', summary.ingredients);
   addBackupSummaryItem(summary.products === 1 ? 'producto' : 'productos', summary.products);
   addBackupSummaryItem(summary.sales === 1 ? 'venta' : 'ventas', summary.sales);
+  addBackupSummaryItem(summary.expenses === 1 ? 'gasto' : 'gastos', summary.expenses);
   addBackupSummaryItem('ingredientes archivados', summary.archivedIngredients);
   addBackupSummaryItem('productos archivados', summary.archivedProducts);
   if (summary.productsWithMissingIngredients > 0) {
@@ -2003,9 +2281,13 @@ function renderBackupSummary(summary, fileName) {
       summary.salesWithMissingProducts,
     );
   }
-  backupMessage.textContent = summary.clearsSales
-    ? `“${fileName}” es una copia válida de formato 1. No contiene ventas: restaurarla dejará la lista de ventas vacía.`
-    : `“${fileName}” es una copia válida de formato 2. Revisa el resumen antes de restaurarla.`;
+  if (summary.clearsSales) {
+    backupMessage.textContent = `“${fileName}” es una copia válida de formato 1. No contiene ventas ni gastos: restaurarla dejará ambas listas vacías.`;
+  } else if (summary.clearsExpenses) {
+    backupMessage.textContent = `“${fileName}” es una copia válida de formato 2. No contiene gastos: restaurarla dejará la lista de gastos vacía.`;
+  } else {
+    backupMessage.textContent = `“${fileName}” es una copia válida de formato 3. Revisa el resumen antes de restaurarla.`;
+  }
 }
 
 function hasPendingInterfaceChanges() {
@@ -2013,24 +2295,26 @@ function hasPendingInterfaceChanges() {
     || [...form.elements].some((control) => control instanceof HTMLInputElement
       && control.type !== 'checkbox' && control.value.trim() !== '');
   return ingredientHasData || productFormDirty || editingProductId !== null || simulatorDirty
-    || saleFormDirty || editingSaleId !== null;
+    || saleFormDirty || editingSaleId !== null || expenseFormDirty || editingExpenseId !== null;
 }
 
 exportBackupButton.addEventListener('click', () => {
   let ingredients;
   let products;
   let sales;
+  let expenses;
   try {
     ingredients = readIngredients();
     products = readProducts();
     sales = readSales();
+    expenses = readExpenses();
   } catch {
     clearPendingBackup('No se puede exportar: los datos guardados están dañados o no se pueden leer. No se ha generado ningún archivo.');
     return;
   }
 
   try {
-    const backupDocument = createBackupDocument(ingredients, products, sales);
+    const backupDocument = createBackupDocument(ingredients, products, sales, expenses);
     const blob = new Blob([`${JSON.stringify(backupDocument, null, 2)}\n`], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -2040,7 +2324,7 @@ exportBackupButton.addEventListener('click', () => {
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
-    backupMessage.textContent = `Copia exportada con ${formatCount(ingredients.length, 'ingrediente')}, ${formatCount(products.length, 'producto')} y ${formatCount(sales.length, 'venta')}.`;
+    backupMessage.textContent = `Copia exportada con ${formatCount(ingredients.length, 'ingrediente')}, ${formatCount(products.length, 'producto')}, ${formatCount(sales.length, 'venta')} y ${formatCount(expenses.length, 'gasto')}.`;
   } catch {
     backupMessage.textContent = 'No se ha podido generar o descargar la copia. Los datos guardados no se han modificado.';
   }
@@ -2057,6 +2341,7 @@ importBackupInput.addEventListener('change', async () => {
       ingredients: localStorage.getItem(storageKey),
       products: localStorage.getItem(productStorageKey),
       sales: localStorage.getItem(salesStorageKey),
+      expenses: localStorage.getItem(expensesStorageKey),
     };
   } catch {
     clearPendingBackup('El navegador no permite acceder al almacenamiento. No se ha modificado ningún dato.');
@@ -2079,23 +2364,27 @@ importBackupInput.addEventListener('change', async () => {
 restoreBackupButton.addEventListener('click', () => {
   if (!pendingBackup) return;
   const { data, summary, expectedRawValues } = pendingBackup;
-  const isEmpty = summary.ingredients === 0 && summary.products === 0 && summary.sales === 0;
+  const isEmpty = summary.ingredients === 0 && summary.products === 0
+    && summary.sales === 0 && summary.expenses === 0;
   const missingReferenceWarning = summary.productsWithMissingIngredients > 0
     ? `\n\n${formatCount(summary.productsWithMissingIngredients, 'producto')} quedarán como no calculables porque contienen referencias a ingredientes inexistentes.`
     : '';
   const pendingChangesWarning = hasPendingInterfaceChanges()
-    ? '\n\nLas ediciones, ventas pendientes o simulaciones sin guardar se descartarán solo si la restauración termina correctamente.'
+    ? '\n\nLas ediciones, ventas, gastos pendientes o simulaciones sin guardar se descartarán solo si la restauración termina correctamente.'
     : '';
   const legacyWarning = summary.clearsSales
-    ? '\n\nATENCIÓN: esta copia es de formato 1 y no contiene ventas. Al restaurarla se eliminarán todas las ventas locales actuales.'
+    ? '\n\nATENCIÓN: esta copia es de formato 1 y no contiene ventas ni gastos. Al restaurarla se eliminarán todas las ventas y gastos locales actuales.'
+    : '';
+  const legacyExpensesWarning = !summary.clearsSales && summary.clearsExpenses
+    ? '\n\nATENCIÓN: esta copia es de formato 2 y no contiene gastos. Al restaurarla se eliminarán todos los gastos locales actuales.'
     : '';
   const emptyWarning = isEmpty
-    ? '\n\nATENCIÓN: esta copia está completamente vacía y eliminará todos los ingredientes, productos y ventas actuales.'
+    ? '\n\nATENCIÓN: esta copia está completamente vacía y eliminará todos los ingredientes, productos, ventas y gastos actuales.'
     : '';
   const missingSaleReferenceWarning = summary.salesWithMissingProducts > 0
     ? `\n\n${formatCount(summary.salesWithMissingProducts, 'venta')} tienen referencias a productos inexistentes. Mantendrán sus importes históricos.`
     : '';
-  const confirmation = `Restaurar esta copia reemplazará todos los datos actuales por ${formatCount(summary.ingredients, 'ingrediente')}, ${formatCount(summary.products, 'producto')} y ${formatCount(summary.sales, 'venta')}.${emptyWarning}${legacyWarning}${missingReferenceWarning}${missingSaleReferenceWarning}${pendingChangesWarning}\n\n¿Quieres continuar?`;
+  const confirmation = `Restaurar esta copia reemplazará todos los datos actuales por ${formatCount(summary.ingredients, 'ingrediente')}, ${formatCount(summary.products, 'producto')}, ${formatCount(summary.sales, 'venta')} y ${formatCount(summary.expenses, 'gasto')}.${emptyWarning}${legacyWarning}${legacyExpensesWarning}${missingReferenceWarning}${missingSaleReferenceWarning}${pendingChangesWarning}\n\n¿Quieres continuar?`;
   if (!window.confirm(confirmation)) {
     backupMessage.textContent = 'Restauración cancelada. La copia validada sigue preparada y no se ha modificado ningún dato.';
     return;
@@ -2106,13 +2395,15 @@ restoreBackupButton.addEventListener('click', () => {
     const restoredIngredients = readIngredients();
     readProducts();
     readSales();
+    readExpenses();
     finishEditing({ focus: false });
     finishProductEditing(restoredIngredients, { focus: false });
     finishSaleEditing({ focus: false });
+    finishExpenseEditing({ focus: false });
     saveMessage.textContent = '';
     productSaveMessage.textContent = '';
     importBackupInput.value = '';
-    clearPendingBackup(`Copia restaurada correctamente: ${formatCount(summary.ingredients, 'ingrediente')}, ${formatCount(summary.products, 'producto')} y ${formatCount(summary.sales, 'venta')}.`);
+    clearPendingBackup(`Copia restaurada correctamente: ${formatCount(summary.ingredients, 'ingrediente')}, ${formatCount(summary.products, 'producto')}, ${formatCount(summary.sales, 'venta')} y ${formatCount(summary.expenses, 'gasto')}.`);
     exportBackupButton.focus();
   } catch (error) {
     backupMessage.textContent = error.message;
@@ -2123,7 +2414,17 @@ const today = getLocalDateString();
 initializeNavigation();
 saleDateInput.max = today;
 salesDateFilterInput.max = today;
+expenseDateInput.max = today;
+expensesDateFilterInput.max = today;
 saleDateInput.value = today;
 salesDateFilterInput.value = today;
+expenseDateInput.value = today;
+expensesDateFilterInput.value = today;
+for (const category of SUGGESTED_EXPENSE_CATEGORIES) {
+  const option = document.createElement('option');
+  option.value = category;
+  expenseCategorySuggestions.append(option);
+}
 renderStoredIngredients();
 refreshProductFeatures();
+refreshExpenses();

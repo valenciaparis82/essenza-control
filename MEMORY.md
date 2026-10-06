@@ -3,48 +3,44 @@
 ## Estado actual
 - Ingredientes completos: alta, cálculo, edición, archivado, restauración y persistencia local.
 - Productos completos: recetas, indicadores, edición, archivado, restauración y persistencia local.
-- Comparativa, simulador temporal y copias de seguridad completos.
-- Ventas diarias completas: alta, resumen por fecha, edición y eliminación confirmada.
-- Interfaz optimizada: formularios sobre listados a ancho completo, filas/tablas compactas en escritorio y tarjetas responsive.
-- HTML, CSS y JavaScript con Vite; sin framework, backend, autenticación ni sincronización.
-- Inicio: `npm run dev`. Pruebas: `npm test`.
+- Comparativa, simulador temporal, ventas diarias y copias de seguridad completos.
+- Gastos completos: alta, edición, cancelación, eliminación confirmada, ordenación y resumen diario.
+- Interfaz responsive con formularios sobre listados, tablas compactas y tarjetas móviles.
+- HTML, CSS y JavaScript con Vite; inicio: `npm run dev`; pruebas: `npm test`.
 
 ## Datos y comportamiento
 - `essenza.ingredients`: `{ id, name, price, quantity, unit, archived? }`.
 - `essenza.products`: `{ id, name, category, salePrice, recipe, archived? }`.
 - `essenza.sales`: `{ id, date, productId, units, unitSalePrice, unitCost }`.
-- Ausencia de `essenza.sales` significa lista vacía y mantiene compatibles los datos locales anteriores.
-- Cada venta referencia el producto por ID y guarda precio/coste unitarios del momento del registro.
-- Ingresos, coste vendido y margen se derivan sin redondeo intermedio; admiten margen negativo.
-- Cambiar ingredientes, receta o precio no recalcula ventas históricas.
-- Editar fecha/unidades conserva importes; cambiar producto captura los actuales y conserva el ID.
-- Las ventas repetidas de producto/fecha son independientes; unidades enteras >0 y sin fecha futura.
-- Solo productos activos y calculables admiten ventas nuevas; las históricas sobreviven al archivado.
-- Una referencia inexistente muestra “Producto no disponible” y conserva cálculos históricos.
-- La eliminación es definitiva, confirmada y solo para corregir errores.
-- El resumen muestra una sola fecha; importes operativos con IVA incluido, no beneficio neto.
+- `essenza.expenses`: `{ id, date, category, description, amount, type }`.
+- Una colección ausente de ventas o gastos significa lista vacía para mantener compatibilidad.
+- Los gastos admiten categorías libres con sugerencias; fecha válida no futura e importe finito > 0.
+- Editar conserva el ID; eliminar es definitivo y confirmado; duplicados reales están permitidos.
+- Total y cantidad diarios se derivan sin redondeo intermedio y no se guardan.
+- Los gastos fijos se registran manualmente: no hay recurrencias ni plantillas.
+- No registrar como gasto ingredientes de recetas: las ventas ya incluyen su coste y se duplicaría.
 - localStorage es local al navegador, dispositivo y origen; no es respaldo ni sincronización.
-- Copia formato 2: `{ application, formatVersion, exportedAt, data: { ingredients, products, sales } }`.
-- Formato 1 es importable y restaura ventas vacías con advertencia; formato 2 conserva ventas.
-- Restaurar reemplaza las tres colecciones y revierte todas si falla alguna escritura.
+- Copia formato 3: `{ application, formatVersion, exportedAt, data: { ingredients, products, sales, expenses } }`.
+- Formato 1 restaura ventas/gastos vacíos; formato 2 restaura gastos vacíos, siempre con advertencia.
+- Restaurar reemplaza las cuatro colecciones y revierte todas si falla alguna escritura.
 
 ## Arquitectura
 - `src/calculations.js` centraliza costes de ingredientes y productos.
-- `src/sales.js` valida fechas/ventas y calcula totales y resúmenes diarios sin DOM.
-- `src/product-comparison.js` prepara la comparativa sin DOM ni almacenamiento.
-- `src/data-validation.js` valida ingredientes, productos y ventas.
-- `src/backup.js` gestiona copias 1/2 y restauración transaccional.
-- `src/main.js` coordina interfaz, persistencia y navegación por hash sin escribir estado de navegación.
-- Secciones por hash: Inicio, Ingredientes, Productos, Ventas y Datos; los paneles solo se ocultan y conservan todos los estados pendientes.
+- `src/sales.js` valida ventas y calcula sus valores históricos y resúmenes diarios.
+- `src/expenses.js` valida, ordena y resume gastos sin DOM ni almacenamiento.
+- `src/date-utils.js` comparte validación y fecha local entre ventas y gastos.
+- `src/data-validation.js` valida las cuatro colecciones; `src/backup.js` gestiona copias 1/2/3.
+- `src/main.js` coordina interfaz, localStorage y navegación sin descartar estados pendientes.
+- Hashes: Inicio, Ingredientes, Productos, Ventas, Gastos y Datos.
 
 ## Comprobaciones
-- `npm test`: 27/27; build de Vite, `node --check` y `git diff --check` correctos.
-- Navegador aislado: alta repetida, resumen, edición, eliminación e histórico comprobados.
-- Tras duplicar el coste del ingrediente, ventas anteriores conservaron precio y coste guardados.
-- Importación/restauración de formatos 1 y 2 comprobada en lógica y navegador.
-- Chrome DevTools: 1440, 1280, 1024, 800, 768, 480 y 375 px sin desbordamiento; listas largas y acciones comprobadas.
-- Accesibilidad Lighthouse 100/100 incluso con archivados visibles; sin errores de consola.
+- `npm test`: 33/33; formatos 1/2/3 y rollback en cada una de las cuatro escrituras.
+- Build de Vite, `node --check` y `git diff --check` correctos.
+- Navegador aislado: alta, edición, cancelación, eliminación, orden y persistencia comprobados.
+- Carga directa `#gastos`, Atrás/Adelante y conservación del formulario pendiente comprobadas.
+- Responsive revisado en 1440, 1024, 800, 768, 480 y 375 px, sin desbordamiento.
+- Sin errores ni advertencias de consola; queda un aviso informativo de autofill ya existente.
 
 ## Fuera de alcance
-- Sin informes semanales/mensuales, gráficos, gastos, beneficio neto, devoluciones ni dashboard.
-- Sin búsquedas, migraciones adicionales, PWA, backend ni sincronización.
+- Sin resumen mensual, recurrencias, plantillas, beneficio, resultado operativo ni punto de equilibrio.
+- Sin dashboard, gráficos, fiscalidad, inventario, proveedores, PWA, backend ni sincronización.

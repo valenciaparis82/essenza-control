@@ -28,13 +28,13 @@ Construir una aplicación web responsive para la cafetería Essenza que permita 
 
 \- ventas diarias por producto
 
+\- gastos operativos diarios
+
 
 
 Más adelante podrá ampliarse con:
 
 
-
-\- gastos
 
 \- beneficio mensual
 
@@ -228,11 +228,29 @@ No crear archivos, módulos o abstracciones antes de que hagan falta.
 
 \- El resumen de ventas de esta fase es diario; no incluye informes semanales, mensuales ni gráficos.
 
+\- Cada gasto debe tener un ID estable, fecha, categoría flexible, concepto o descripción, importe y tipo fijo o variable.
+
+\- La fecha del gasto debe ser válida y no futura; el importe debe ser un número finito mayor que cero.
+
+\- Editar un gasto conserva su ID y eliminarlo definitivamente requiere confirmación.
+
+\- Se permiten varios gastos iguales el mismo día porque pueden representar operaciones reales independientes.
+
+\- El resumen de gastos es diario; el total y el número de registros son derivados y no se guardan.
+
+\- Los gastos fijos se registran manualmente; clasificarlos como fijos no crea recurrencias ni plantillas automáticas.
+
+\- Las compras de ingredientes utilizados en recetas no se registran también como gastos operativos: su coste ya forma parte del coste histórico de las ventas y hacerlo duplicaría el coste.
+
+\- Compras generales solo se consideran gasto operativo cuando no corresponden a ingredientes incluidos en recetas.
+
 \- Las copias de seguridad usan un formato JSON estricto con identificador de aplicación y versión explícita.
 
-\- Una copia incluye ingredientes, productos y ventas completos, conservando IDs, recetas, estado de archivado y valores históricos de ventas; no incluye otros costes ni indicadores derivados.
+\- Una copia incluye ingredientes, productos, ventas y gastos completos, conservando IDs, recetas, estado de archivado y valores históricos de ventas; no incluye indicadores derivados.
 
 \- El formato de copia 2 incluye ventas. El formato 1 sigue siendo importable, pero restaura las ventas como una lista vacía con una advertencia explícita.
+
+\- El formato de copia 3 incluye gastos. Los formatos 1 y 2 siguen siendo importables y restauran los gastos como una lista vacía con una advertencia explícita.
 
 \- La importación se valida por completo antes de modificar localStorage; un archivo dañado, incompleto o incompatible no puede sobrescribir los datos existentes.
 
@@ -248,9 +266,9 @@ No crear archivos, módulos o abstracciones antes de que hagan falta.
 
 \- Las copias son manuales y no se deben presentar como sincronización, historial automático ni respaldo remoto.
 
-\- La interfaz se organiza en las secciones internas Inicio, Ingredientes, Productos, Ventas y Datos dentro de una sola aplicación.
+\- La interfaz se organiza en las secciones internas Inicio, Ingredientes, Productos, Ventas, Gastos y Datos dentro de una sola aplicación.
 
-\- La navegación usa los hashes `#inicio`, `#ingredientes`, `#productos`, `#ventas` y `#datos`; un hash vacío o desconocido abre Inicio.
+\- La navegación usa los hashes `#inicio`, `#ingredientes`, `#productos`, `#ventas`, `#gastos` y `#datos`; un hash vacío o desconocido abre Inicio.
 
 \- Navegar solo muestra u oculta paneles existentes: no recarga la página, no reconstruye formularios, no descarta cambios pendientes y no escribe en `localStorage`.
 
@@ -313,6 +331,14 @@ Margen generado por una venta:
 
 
 (precio unitario histórico - coste unitario histórico) \* unidades vendidas
+
+
+
+Total de gastos del día:
+
+
+
+suma de los importes de los gastos registrados para esa fecha
 
 
 
