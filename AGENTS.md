@@ -30,13 +30,15 @@ Construir una aplicación web responsive para la cafetería Essenza que permita 
 
 \- gastos operativos diarios
 
+\- resultados operativos diarios y mensuales
+
 
 
 Más adelante podrá ampliarse con:
 
 
 
-\- beneficio mensual
+\- beneficio contable o fiscal
 
 \- punto de equilibrio
 
@@ -244,6 +246,20 @@ No crear archivos, módulos o abstracciones antes de que hagan falta.
 
 \- Compras generales solo se consideran gasto operativo cuando no corresponden a ingredientes incluidos en recetas.
 
+\- Resultados combina ventas históricas y gastos registrados para un día natural o un mes natural; sus totales son derivados y nunca se guardan.
+
+\- Los ingresos y el coste de producto vendido se calculan desde el precio y coste unitarios históricos de cada venta, aunque el producto esté archivado o ya no exista.
+
+\- Margen bruto del periodo = ingresos - coste de producto vendido; resultado operativo = margen bruto - gastos operativos.
+
+\- Los gastos se imputan completamente a la fecha registrada, sin prorrateo; un gasto periódico grande puede distorsionar un día y el mes suele ser más representativo.
+
+\- El resultado operativo es una estimación con importes registrados con IVA incluido; no representa beneficio neto ni resultado contable o fiscal.
+
+\- Resultados muestra solo los cinco totales del periodo, sin desglose diario mensual ni desglose de gastos fijos y variables.
+
+\- Los cálculos de Resultados usan los valores completos sin redondeo intermedio y no muestran totales parciales si algún dato impide calcularlos.
+
 \- Las copias de seguridad usan un formato JSON estricto con identificador de aplicación y versión explícita.
 
 \- Una copia incluye ingredientes, productos, ventas y gastos completos, conservando IDs, recetas, estado de archivado y valores históricos de ventas; no incluye indicadores derivados.
@@ -266,9 +282,9 @@ No crear archivos, módulos o abstracciones antes de que hagan falta.
 
 \- Las copias son manuales y no se deben presentar como sincronización, historial automático ni respaldo remoto.
 
-\- La interfaz se organiza en las secciones internas Inicio, Ingredientes, Productos, Ventas, Gastos y Datos dentro de una sola aplicación.
+\- La interfaz se organiza en las secciones internas Inicio, Ingredientes, Productos, Ventas, Gastos, Resultados y Datos dentro de una sola aplicación.
 
-\- La navegación usa los hashes `#inicio`, `#ingredientes`, `#productos`, `#ventas`, `#gastos` y `#datos`; un hash vacío o desconocido abre Inicio.
+\- La navegación usa los hashes `#inicio`, `#ingredientes`, `#productos`, `#ventas`, `#gastos`, `#resultados` y `#datos`; un hash vacío o desconocido abre Inicio.
 
 \- Navegar solo muestra u oculta paneles existentes: no recarga la página, no reconstruye formularios, no descarta cambios pendientes y no escribe en `localStorage`.
 
@@ -339,6 +355,38 @@ Total de gastos del día:
 
 
 suma de los importes de los gastos registrados para esa fecha
+
+
+
+Coste de producto vendido del periodo:
+
+
+
+suma del coste unitario histórico \* unidades vendidas
+
+
+
+Margen bruto del periodo:
+
+
+
+ingresos del periodo - coste de producto vendido del periodo
+
+
+
+Gastos operativos del periodo:
+
+
+
+suma de los importes de los gastos registrados en el periodo
+
+
+
+Resultado operativo:
+
+
+
+margen bruto del periodo - gastos operativos del periodo
 
 
 

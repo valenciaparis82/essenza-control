@@ -34,6 +34,7 @@ import {
   summarizeExpensesByDate,
   SUGGESTED_EXPENSE_CATEGORIES,
 } from './expenses.js';
+import { calculateOperatingResults } from './results.js';
 
 function formatNumber(value) {
   // Los valores diminutos usan notación científica para no mostrarse como cero.
@@ -51,6 +52,7 @@ const sectionNames = {
   productos: 'Productos',
   ventas: 'Ventas',
   gastos: 'Gastos',
+  resultados: 'Resultados',
   datos: 'Datos',
 };
 const sectionPanels = [...document.querySelectorAll('[data-section-panel]')];
@@ -212,6 +214,17 @@ const dailyExpenseTotalOutput = document.querySelector('#daily-expense-total');
 const expensesListMessage = document.querySelector('#expenses-list-message');
 const expensesTableWrapper = document.querySelector('#expenses-table-wrapper');
 const expensesBody = document.querySelector('#expenses-body');
+const resultsPeriodInput = document.querySelector('#results-period');
+const resultsDayField = document.querySelector('#results-day-field');
+const resultsMonthField = document.querySelector('#results-month-field');
+const resultsDayInput = document.querySelector('#results-day');
+const resultsMonthInput = document.querySelector('#results-month');
+const resultsMessage = document.querySelector('#results-message');
+const resultsRevenueOutput = document.querySelector('#results-revenue');
+const resultsProductCostOutput = document.querySelector('#results-product-cost');
+const resultsGrossMarginOutput = document.querySelector('#results-gross-margin');
+const resultsOperatingExpensesOutput = document.querySelector('#results-operating-expenses');
+const resultsOperatingResultOutput = document.querySelector('#results-operating-result');
 const exportBackupButton = document.querySelector('#export-backup');
 const importBackupInput = document.querySelector('#import-backup-file');
 const restoreBackupButton = document.querySelector('#restore-backup');
@@ -1617,6 +1630,13 @@ function formatCalendarDate(date) {
   }).format(new Date(year, month - 1, day));
 }
 
+function formatCalendarMonth(monthValue) {
+  const [year, month] = monthValue.split('-').map(Number);
+  return new Intl.DateTimeFormat('es-ES', {
+    month: 'long', year: 'numeric',
+  }).format(new Date(year, month - 1, 1));
+}
+
 function getSaleProductSignature(product, ingredients) {
   return JSON.stringify({
     product: getStoredProductData(product),
@@ -1801,6 +1821,7 @@ function refreshSales(knownProducts = null, knownIngredients = null) {
     populateSaleProducts(products);
     updateSalePreview(products, ingredients);
     renderDailySales(sales, products);
+    refreshResults();
     return true;
   } catch {
     resetSalePreview('No se pueden recuperar los datos necesarios para registrar ventas.');
@@ -1808,6 +1829,7 @@ function refreshSales(knownProducts = null, knownIngredients = null) {
     salesTableWrapper.hidden = true;
     salesListMessage.hidden = false;
     salesListMessage.textContent = 'No se pueden recuperar las ventas. Los datos pueden estar dañados o el almacenamiento estar bloqueado. No se han sobrescrito.';
+    refreshResults();
     return false;
   }
 }
@@ -2089,12 +2111,14 @@ function renderDailyExpenses(expenses) {
 function refreshExpenses() {
   try {
     renderDailyExpenses(readExpenses());
+    refreshResults();
     return true;
   } catch {
     expensesBody.replaceChildren();
     expensesTableWrapper.hidden = true;
     expensesListMessage.hidden = false;
     expensesListMessage.textContent = 'No se pueden recuperar los gastos. Los datos pueden estar dañados o el almacenamiento estar bloqueado. No se han sobrescrito.';
+    refreshResults();
     return false;
   }
 }
@@ -2237,6 +2261,67 @@ expensesBody.addEventListener('click', (event) => {
   expenseSaveMessage.textContent = 'Gasto eliminado definitivamente como corrección del registro.';
   expensesDateFilterInput.focus();
 });
+
+function resetResultsOutputs() {
+  for (const output of [
+    resultsRevenueOutput,
+    resultsProductCostOutput,
+    resultsGrossMarginOutput,
+    resultsOperatingExpensesOutput,
+    resultsOperatingResultOutput,
+  ]) {
+    output.textContent = '—';
+    output.classList.remove('negative-value');
+  }
+}
+
+function renderResults(sales, expenses) {
+  const period = resultsPeriodInput.value;
+  const value = period === 'day' ? resultsDayInput.value : resultsMonthInput.value;
+  const summary = calculateOperatingResults(sales, expenses, { period, value });
+  if (summary.error) {
+    resetResultsOutputs();
+    resultsMessage.textContent = `No se pueden calcular los resultados: ${summary.error}`;
+    return;
+  }
+
+  resultsRevenueOutput.textContent = `${formatNumber(summary.revenue)} €`;
+  resultsProductCostOutput.textContent = `${formatNumber(summary.productCost)} €`;
+  resultsGrossMarginOutput.textContent = `${formatNumber(summary.grossMargin)} €`;
+  resultsOperatingExpensesOutput.textContent = `${formatNumber(summary.operatingExpenses)} €`;
+  resultsOperatingResultOutput.textContent = `${formatNumber(summary.operatingResult)} €`;
+  resultsGrossMarginOutput.classList.toggle('negative-value', summary.grossMargin < 0);
+  resultsOperatingResultOutput.classList.toggle('negative-value', summary.operatingResult < 0);
+
+  const periodLabel = period === 'day' ? formatCalendarDate(value) : formatCalendarMonth(value);
+  const saleLabel = summary.saleCount === 1 ? 'venta' : 'ventas';
+  const expenseLabel = summary.expenseCount === 1 ? 'gasto' : 'gastos';
+  resultsMessage.textContent = summary.saleCount === 0 && summary.expenseCount === 0
+    ? `No hay ventas ni gastos registrados en ${periodLabel}. Los indicadores del periodo son cero.`
+    : `Resultado de ${periodLabel}: ${summary.saleCount} ${saleLabel} y ${summary.expenseCount} ${expenseLabel}.`;
+}
+
+function refreshResults() {
+  try {
+    renderResults(readSales(), readExpenses());
+    return true;
+  } catch {
+    resetResultsOutputs();
+    resultsMessage.textContent = 'No se pueden recuperar las ventas o los gastos. Los datos pueden estar dañados o el almacenamiento estar bloqueado. No se han sobrescrito.';
+    return false;
+  }
+}
+
+function updateResultsPeriod() {
+  const showsDay = resultsPeriodInput.value === 'day';
+  resultsDayField.hidden = !showsDay;
+  resultsMonthField.hidden = showsDay;
+  refreshResults();
+}
+
+resultsPeriodInput.addEventListener('change', updateResultsPeriod);
+resultsDayInput.addEventListener('change', refreshResults);
+resultsMonthInput.addEventListener('change', refreshResults);
 
 function clearPendingBackup(message = '') {
   pendingBackup = null;
@@ -2416,10 +2501,14 @@ saleDateInput.max = today;
 salesDateFilterInput.max = today;
 expenseDateInput.max = today;
 expensesDateFilterInput.max = today;
+resultsDayInput.max = today;
+resultsMonthInput.max = today.slice(0, 7);
 saleDateInput.value = today;
 salesDateFilterInput.value = today;
 expenseDateInput.value = today;
 expensesDateFilterInput.value = today;
+resultsDayInput.value = today;
+resultsMonthInput.value = today.slice(0, 7);
 for (const category of SUGGESTED_EXPENSE_CATEGORIES) {
   const option = document.createElement('option');
   option.value = category;

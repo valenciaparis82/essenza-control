@@ -23,6 +23,7 @@
           <a class="navigation-link" href="#productos" data-section-link="productos" data-navigation-link>Productos</a>
           <a class="navigation-link" href="#ventas" data-section-link="ventas" data-navigation-link>Ventas</a>
           <a class="navigation-link" href="#gastos" data-section-link="gastos" data-navigation-link>Gastos</a>
+          <a class="navigation-link" href="#resultados" data-section-link="resultados" data-navigation-link>Resultados</a>
           <a class="navigation-link" href="#datos" data-section-link="datos" data-navigation-link>Datos</a>
         </nav>
       </aside>
@@ -54,6 +55,10 @@
             <a class="quick-access-link" href="#gastos" data-section-link="gastos">
               <strong>Gastos</strong>
               <span>Registra gastos operativos y consulta el total diario.</span>
+            </a>
+            <a class="quick-access-link" href="#resultados" data-section-link="resultados">
+              <strong>Resultados</strong>
+              <span>Combina ventas y gastos por día o mes.</span>
             </a>
             <a class="quick-access-link" href="#datos" data-section-link="datos">
               <strong>Datos</strong>
@@ -525,6 +530,56 @@
             </div>
           </section>
         </div>
+      </section>
+
+      <section id="resultados" class="section-panel results-section" data-section-panel="resultados" aria-labelledby="results-title" hidden>
+        <div class="results-heading">
+          <div>
+            <h1 id="results-title" data-section-title tabindex="-1">Resultados</h1>
+            <p>Combina las ventas históricas y los gastos registrados para consultar una estimación operativa.</p>
+          </div>
+          <span class="derived-data-label">Cálculo derivado</span>
+        </div>
+
+        <section class="results-summary" aria-labelledby="results-summary-title">
+          <div class="results-summary-heading">
+            <div>
+              <h2 id="results-summary-title">Resumen del periodo</h2>
+              <p>Los totales se calculan al consultar y no se guardan.</p>
+            </div>
+            <div class="results-controls">
+              <div class="field">
+                <label for="results-period">Periodo</label>
+                <select id="results-period">
+                  <option value="day" selected>Día</option>
+                  <option value="month">Mes</option>
+                </select>
+              </div>
+              <div id="results-day-field" class="field">
+                <label for="results-day">Día consultado</label>
+                <input id="results-day" type="date" />
+              </div>
+              <div id="results-month-field" class="field" hidden>
+                <label for="results-month">Mes consultado</label>
+                <input id="results-month" type="month" />
+              </div>
+            </div>
+          </div>
+
+          <p id="results-message" class="results-message" role="status" aria-live="polite"></p>
+          <dl class="results-totals">
+            <div><dt>Ingresos</dt><dd id="results-revenue">0 €</dd></div>
+            <div><dt>Coste de producto vendido</dt><dd id="results-product-cost">0 €</dd></div>
+            <div><dt>Margen bruto</dt><dd id="results-gross-margin">0 €</dd></div>
+            <div><dt>Gastos operativos</dt><dd id="results-operating-expenses">0 €</dd></div>
+            <div class="operating-result-total"><dt>Resultado operativo</dt><dd id="results-operating-result">0 €</dd></div>
+          </dl>
+
+          <div class="results-explanation">
+            <p><strong>Cómo se interpreta:</strong> es una estimación operativa basada en los importes registrados con IVA incluido. No representa beneficio neto, resultado contable ni resultado fiscal.</p>
+            <p><strong>Imputación de gastos:</strong> cada gasto se asigna completamente a la fecha en que fue registrado, sin prorratearlo. Por ello, un gasto periódico grande puede distorsionar un día concreto; el resultado mensual suele ser más representativo.</p>
+          </div>
+        </section>
       </section>
 
       <section id="datos" class="section-panel data-area" data-section-panel="datos" aria-labelledby="data-title" hidden>

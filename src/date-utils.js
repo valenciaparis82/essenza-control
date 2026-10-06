@@ -13,3 +13,9 @@ export function isValidCalendarDate(value) {
     && date.getUTCMonth() === month - 1
     && date.getUTCDate() === day;
 }
+
+export function isValidCalendarMonth(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}$/.test(value)) return false;
+  const [year, month] = value.split('-').map(Number);
+  return Number.isInteger(year) && year >= 1 && month >= 1 && month <= 12;
+}
