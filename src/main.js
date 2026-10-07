@@ -36,6 +36,7 @@ import {
 } from './expenses.js';
 import { calculateOperatingResults } from './results.js';
 import { calculateMonthlyBreakEven } from './break-even.js';
+import { createDashboardSummary } from './dashboard.js';
 
 function formatNumber(value) {
   // Los valores diminutos usan notación científica para no mostrarse como cero.
@@ -89,6 +90,7 @@ function activateSection(sectionId, { moveFocus = false } = {}) {
     }
   }
   mobileCurrentSection.textContent = sectionNames[activeSectionId];
+  if (activeSectionId === 'inicio') refreshDashboard();
 
   if (moveFocus) {
     const activePanel = sectionPanels.find((panel) => panel.dataset.sectionPanel === activeSectionId);
@@ -242,6 +244,52 @@ const breakEvenDifferenceLabel = document.querySelector('#break-even-difference-
 const breakEvenDifferenceOutput = document.querySelector('#break-even-difference');
 const breakEvenAttainmentOutput = document.querySelector('#break-even-attainment');
 const breakEvenStatus = document.querySelector('#break-even-status');
+const dashboardMessage = document.querySelector('#dashboard-message');
+const dashboardTodayDescription = document.querySelector('#dashboard-today-description');
+const dashboardMonthDescription = document.querySelector('#dashboard-month-description');
+const dashboardBreakEvenWarning = document.querySelector('#dashboard-break-even-warning');
+const dashboardBreakEvenStatus = document.querySelector('#dashboard-break-even-status');
+const dashboardBreakEvenTarget = document.querySelector('#dashboard-break-even-target');
+const dashboardBreakEvenRevenue = document.querySelector('#dashboard-break-even-revenue');
+const dashboardBreakEvenDifferenceLabel = document.querySelector('#dashboard-break-even-difference-label');
+const dashboardBreakEvenDifference = document.querySelector('#dashboard-break-even-difference');
+const dashboardBreakEvenAttainment = document.querySelector('#dashboard-break-even-attainment');
+const dashboardOutputs = {
+  today: {
+    revenue: document.querySelector('#dashboard-today-revenue'),
+    productCost: document.querySelector('#dashboard-today-product-cost'),
+    grossMargin: document.querySelector('#dashboard-today-gross-margin'),
+    operatingExpenses: document.querySelector('#dashboard-today-operating-expenses'),
+    operatingResult: document.querySelector('#dashboard-today-operating-result'),
+    resultStatus: document.querySelector('#dashboard-today-result-status'),
+  },
+  month: {
+    revenue: document.querySelector('#dashboard-month-revenue'),
+    productCost: document.querySelector('#dashboard-month-product-cost'),
+    grossMargin: document.querySelector('#dashboard-month-gross-margin'),
+    operatingExpenses: document.querySelector('#dashboard-month-operating-expenses'),
+    operatingResult: document.querySelector('#dashboard-month-operating-result'),
+    resultStatus: document.querySelector('#dashboard-month-result-status'),
+  },
+  bestMargin: {
+    name: document.querySelector('#dashboard-best-margin-product'),
+    value: document.querySelector('#dashboard-best-margin-value'),
+  },
+  highestFoodCost: {
+    name: document.querySelector('#dashboard-highest-food-cost-product'),
+    value: document.querySelector('#dashboard-highest-food-cost-value'),
+    detail: document.querySelector('#dashboard-highest-food-cost-status'),
+  },
+  highestMargin: {
+    name: document.querySelector('#dashboard-highest-margin-product'),
+    value: document.querySelector('#dashboard-highest-margin-value'),
+  },
+  mostSold: {
+    name: document.querySelector('#dashboard-most-sold-product'),
+    value: document.querySelector('#dashboard-most-sold-value'),
+    detail: document.querySelector('#dashboard-most-sold-detail'),
+  },
+};
 const exportBackupButton = document.querySelector('#export-backup');
 const importBackupInput = document.querySelector('#import-backup-file');
 const restoreBackupButton = document.querySelector('#restore-backup');
@@ -347,6 +395,153 @@ function readExpenses() {
 
 function writeExpenses(expenses) {
   localStorage.setItem(expensesStorageKey, JSON.stringify(expenses));
+}
+
+function resetDashboardOutputs(message) {
+  for (const period of Object.values(dashboardOutputs)) {
+    for (const output of Object.values(period)) {
+      output.textContent = '—';
+      output.classList.remove('negative-value');
+    }
+  }
+  dashboardTodayDescription.textContent = 'Resumen del día actual.';
+  dashboardMonthDescription.textContent = 'Resumen del mes natural actual.';
+  dashboardBreakEvenWarning.textContent = '';
+  dashboardBreakEvenStatus.className = 'break-even-status is-warning';
+  dashboardBreakEvenStatus.textContent = 'No se puede calcular el punto de equilibrio.';
+  dashboardBreakEvenTarget.textContent = '—';
+  dashboardBreakEvenRevenue.textContent = '—';
+  dashboardBreakEvenDifferenceLabel.textContent = 'Diferencia';
+  dashboardBreakEvenDifference.textContent = '—';
+  dashboardBreakEvenAttainment.textContent = '—';
+  dashboardMessage.textContent = message;
+}
+
+function renderDashboardPeriod(outputs, results) {
+  outputs.revenue.textContent = `${formatNumber(results.revenue)} €`;
+  outputs.productCost.textContent = `${formatNumber(results.productCost)} €`;
+  outputs.grossMargin.textContent = `${formatNumber(results.grossMargin)} €`;
+  outputs.operatingExpenses.textContent = `${formatNumber(results.operatingExpenses)} €`;
+  outputs.operatingResult.textContent = `${formatNumber(results.operatingResult)} €`;
+  outputs.grossMargin.classList.toggle('negative-value', results.grossMargin < 0);
+  outputs.operatingResult.classList.toggle('negative-value', results.operatingResult < 0);
+  outputs.resultStatus.textContent = results.operatingResult > 0
+    ? 'Resultado operativo positivo'
+    : results.operatingResult < 0
+      ? 'Resultado operativo negativo'
+      : 'Resultado operativo cero';
+}
+
+function renderDashboardProductMetric(outputs, row, value, detail = '') {
+  if (!row) {
+    outputs.name.textContent = 'No hay productos activos calculables';
+    outputs.value.textContent = 'No calculable';
+    if (outputs.detail) outputs.detail.textContent = '';
+    return;
+  }
+  outputs.name.textContent = row.product.name;
+  outputs.value.textContent = value;
+  if (outputs.detail) outputs.detail.textContent = detail;
+}
+
+function renderDashboardBreakEven(summary, month) {
+  dashboardBreakEvenWarning.textContent = `Mes en curso. El cálculo utiliza únicamente las ventas y los gastos registrados hasta este momento. Los gastos todavía no registrados pueden modificar el punto de equilibrio; no se proyectan ventas ni gastos hasta final de mes.`;
+  dashboardBreakEvenRevenue.textContent = `${formatNumber(summary.actualRevenue)} €`;
+  if (summary.status === 'not-calculable') {
+    dashboardBreakEvenTarget.textContent = 'No calculable';
+    dashboardBreakEvenDifferenceLabel.textContent = 'Diferencia';
+    dashboardBreakEvenDifference.textContent = 'No calculable';
+    dashboardBreakEvenAttainment.textContent = 'No aplicable';
+    dashboardBreakEvenStatus.className = 'break-even-status is-warning';
+    dashboardBreakEvenStatus.textContent = summary.reason === 'no-revenue'
+      ? 'No calculable: no hay facturación registrada para obtener el margen de contribución porcentual.'
+      : 'No existe un punto de equilibrio alcanzable con el margen de contribución observado.';
+    return;
+  }
+
+  dashboardBreakEvenTarget.textContent = `${formatNumber(summary.breakEvenRevenue)} €`;
+  dashboardBreakEvenAttainment.textContent = summary.attainmentPercent === null
+    ? 'No aplicable'
+    : `${formatNumber(summary.attainmentPercent)} %`;
+  if (summary.status === 'below') {
+    dashboardBreakEvenDifferenceLabel.textContent = 'Falta para alcanzar';
+    dashboardBreakEvenDifference.textContent = `${formatNumber(Math.abs(summary.difference))} €`;
+    dashboardBreakEvenStatus.className = 'break-even-status is-pending';
+    dashboardBreakEvenStatus.textContent = 'El punto de equilibrio todavía no se ha alcanzado.';
+  } else if (summary.status === 'exceeded') {
+    dashboardBreakEvenDifferenceLabel.textContent = 'Superado en';
+    dashboardBreakEvenDifference.textContent = `${formatNumber(summary.difference)} €`;
+    dashboardBreakEvenStatus.className = 'break-even-status is-reached';
+    dashboardBreakEvenStatus.textContent = 'El punto de equilibrio se ha superado según los datos registrados.';
+  } else {
+    dashboardBreakEvenDifferenceLabel.textContent = 'Diferencia';
+    dashboardBreakEvenDifference.textContent = '0 €';
+    dashboardBreakEvenStatus.className = 'break-even-status is-reached';
+    dashboardBreakEvenStatus.textContent = 'El punto de equilibrio se ha alcanzado exactamente según los datos registrados.';
+  }
+}
+
+function renderDashboard(summary) {
+  if (summary.error) {
+    resetDashboardOutputs(`No se puede actualizar el dashboard: ${summary.error}`);
+    return;
+  }
+  renderDashboardPeriod(dashboardOutputs.today, summary.todayResults);
+  renderDashboardPeriod(dashboardOutputs.month, summary.monthResults);
+  dashboardTodayDescription.textContent = `Resumen de ${formatCalendarDate(summary.today)}.`;
+  dashboardMonthDescription.textContent = `Resumen de ${formatCalendarMonth(summary.month)}.`;
+  dashboardMessage.textContent = summary.todayResults.saleCount === 0 && summary.todayResults.expenseCount === 0
+    && summary.monthResults.saleCount === 0 && summary.monthResults.expenseCount === 0
+    ? 'Todavía no hay ventas ni gastos registrados hoy ni en el mes actual.'
+    : '';
+  renderDashboardBreakEven(summary.breakEven, summary.month);
+  renderDashboardProductMetric(
+    dashboardOutputs.bestMargin,
+    summary.currentProducts.bestMarginPercent,
+    summary.currentProducts.bestMarginPercent
+      ? `${formatNumber(summary.currentProducts.bestMarginPercent.indicators.marginPercent)} %`
+      : 'No calculable',
+  );
+  const highestFoodCost = summary.currentProducts.highestFoodCost;
+  renderDashboardProductMetric(
+    dashboardOutputs.highestFoodCost,
+    highestFoodCost,
+    highestFoodCost ? `${formatNumber(highestFoodCost.indicators.foodCostPercent)} %` : 'No calculable',
+    highestFoodCost ? `${highestFoodCost.status.label}: ${highestFoodCost.status.description}` : '',
+  );
+  renderDashboardProductMetric(
+    dashboardOutputs.highestMargin,
+    summary.currentProducts.highestMarginAmount,
+    summary.currentProducts.highestMarginAmount
+      ? `${formatNumber(summary.currentProducts.highestMarginAmount.indicators.marginAmount)} €`
+      : 'No calculable',
+  );
+  const mostSold = summary.mostSoldProduct;
+  dashboardOutputs.mostSold.name.textContent = mostSold?.name ?? 'No hay ventas registradas este mes';
+  dashboardOutputs.mostSold.value.textContent = mostSold ? `${formatNumber(mostSold.units)} unidades` : '—';
+  dashboardOutputs.mostSold.detail.textContent = mostSold?.missing
+    ? `Producto no disponible · ID histórico: ${mostSold.id}`
+    : mostSold?.archived
+      ? 'Producto archivado'
+      : mostSold
+        ? 'Producto activo'
+        : 'Dato histórico del mes actual';
+}
+
+function refreshDashboard() {
+  try {
+    renderDashboard(createDashboardSummary({
+      ingredients: readIngredients(),
+      products: readProducts(),
+      sales: readSales(),
+      expenses: readExpenses(),
+      today: getLocalDateString(),
+    }));
+    return true;
+  } catch {
+    resetDashboardOutputs('No se pueden recuperar los datos del dashboard. Los datos pueden estar dañados o el almacenamiento estar bloqueado. No se han sobrescrito.');
+    return false;
+  }
 }
 
 function getStoredProductData(product) {
@@ -1840,6 +2035,7 @@ function refreshSales(knownProducts = null, knownIngredients = null) {
     renderDailySales(sales, products);
     refreshResults();
     refreshBreakEven();
+    refreshDashboard();
     return true;
   } catch {
     resetSalePreview('No se pueden recuperar los datos necesarios para registrar ventas.');
@@ -1849,6 +2045,7 @@ function refreshSales(knownProducts = null, knownIngredients = null) {
     salesListMessage.textContent = 'No se pueden recuperar las ventas. Los datos pueden estar dañados o el almacenamiento estar bloqueado. No se han sobrescrito.';
     refreshResults();
     refreshBreakEven();
+    refreshDashboard();
     return false;
   }
 }
@@ -2132,6 +2329,7 @@ function refreshExpenses() {
     renderDailyExpenses(readExpenses());
     refreshResults();
     refreshBreakEven();
+    refreshDashboard();
     return true;
   } catch {
     expensesBody.replaceChildren();
@@ -2140,6 +2338,7 @@ function refreshExpenses() {
     expensesListMessage.textContent = 'No se pueden recuperar los gastos. Los datos pueden estar dañados o el almacenamiento estar bloqueado. No se han sobrescrito.';
     refreshResults();
     refreshBreakEven();
+    refreshDashboard();
     return false;
   }
 }
@@ -2619,6 +2818,7 @@ restoreBackupButton.addEventListener('click', () => {
     finishProductEditing(restoredIngredients, { focus: false });
     finishSaleEditing({ focus: false });
     finishExpenseEditing({ focus: false });
+    refreshDashboard();
     saveMessage.textContent = '';
     productSaveMessage.textContent = '';
     importBackupInput.value = '';
@@ -2653,3 +2853,4 @@ for (const category of SUGGESTED_EXPENSE_CATEGORIES) {
 renderStoredIngredients();
 refreshProductFeatures();
 refreshExpenses();
+refreshDashboard();

@@ -284,9 +284,17 @@ No crear archivos, módulos o abstracciones antes de que hagan falta.
 
 \- La interfaz se organiza en las secciones internas Inicio, Ingredientes, Productos, Ventas, Gastos, Resultados y Datos dentro de una sola aplicación.
 
-\- La navegación usa los hashes `#inicio`, `#ingredientes`, `#productos`, `#ventas`, `#gastos`, `#resultados` y `#datos`; un hash vacío o desconocido abre Inicio.
+\- La navegación usa los hashes `#inicio`, `#ingredientes`, `#productos`, `#ventas`, `#gastos`, `#resultados`, `#equilibrio` y `#datos`; un hash vacío o desconocido abre Inicio.
 
 \- Navegar solo muestra u oculta paneles existentes: no recarga la página, no reconstruye formularios, no descarta cambios pendientes y no escribe en `localStorage`.
+
+\- Inicio es un dashboard operativo 100 % derivado: no crea claves, campos, copias de seguridad ni totales persistidos.
+
+\- El dashboard separa los resultados históricos (ventas y gastos con sus importes históricos) de los indicadores actuales de productos (solo activos y calculables con costes actuales).
+
+\- Un producto archivado puede aparecer como producto más vendido histórico con su estado; una venta con producto inexistente se mantiene en el cálculo histórico como «Producto no disponible».
+
+\- El dashboard se recalcula al acceder a Inicio y tras cambios relevantes, sin temporizadores ni gráficos.
 
 \- En ordenador la navegación se muestra en una barra lateral y en móvil mediante un menú desplegable accesible, siempre con sección activa y foco visibles.
 

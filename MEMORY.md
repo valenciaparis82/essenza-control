@@ -1,12 +1,11 @@
 # Memoria del proyecto Essenza
 
 ## Estado actual
-- Ingredientes completos: alta, cálculo, edición, archivado, restauración y persistencia local.
-- Productos completos: recetas, indicadores, edición, archivado, restauración y persistencia local.
+- Ingredientes y productos completos: alta, cálculo, edición, archivado, restauración y persistencia local.
 - Comparativa, simulador temporal, ventas diarias y copias de seguridad completos.
 - Gastos completos: alta, edición, cancelación, eliminación confirmada, ordenación y resumen diario.
 - Resultados completos: cinco totales derivados para un día o mes natural, sin persistencia.
-- Punto de equilibrio estimado según datos registrados: cálculo mensual derivado, reutiliza estructuras de ventas y gastos, muestra margen de contribución, gastos fijos/variables, equilibrio no alcanzado/alcanzado/superado, y advertencia si el mes está incompleto.
+- Punto de equilibrio y dashboard Inicio derivados: resumen hoy/mes, contribución, gastos fijos/variables, estado y productos actuales/históricos.
 - Interfaz responsive con formularios sobre listados, tablas compactas y tarjetas móviles.
 - HTML, CSS y JavaScript con Vite; inicio: `npm run dev`; pruebas: `npm test`.
 
@@ -15,10 +14,7 @@
 - `essenza.products`: `{ id, name, category, salePrice, recipe, archived? }`.
 - `essenza.sales`: `{ id, date, productId, units, unitSalePrice, unitCost }`.
 - `essenza.expenses`: `{ id, date, category, description, amount, type }`.
-- Una colección ausente de ventas o gastos significa lista vacía para mantener compatibilidad.
-- Los gastos admiten categorías libres con sugerencias; fecha válida no futura e importe finito > 0.
-- Editar conserva el ID; eliminar es definitivo y confirmado; duplicados reales están permitidos.
-- Los gastos fijos se registran manualmente: no hay recurrencias ni plantillas.
+- Gastos: categorías libres, fecha no futura, importe finito > 0; editar conserva ID, eliminar es confirmado y no hay recurrencias.
 - No registrar como gasto ingredientes de recetas: las ventas ya incluyen su coste y se duplicaría.
 - Resultados deriva ingresos y coste vendido desde ventas históricas; margen bruto = ingresos - coste.
 - Resultado operativo = margen bruto - gastos; admite negativos y no guarda ningún total.
@@ -35,20 +31,20 @@
 - `src/expenses.js` valida, ordena y resume gastos; `src/date-utils.js` comparte las fechas.
 - `src/results.js` combina ventas y gastos por día/mes sin DOM ni almacenamiento; amplía su salida para devolver gastos fijos y variables por separado.
 - `src/break-even.js` lógica pura del punto de equilibrio mensual, reutiliza resultados.js y devuelve margen de contribución, gastos fijos, equilibrio estimado.
+- `src/dashboard.js` compone sin DOM ni almacenamiento Resultados, Equilibrio, Comparativa y producto más vendido; no duplica fórmulas.
 - `src/data-validation.js` valida las cuatro colecciones; `src/backup.js` gestiona copias 1/2/3.
 - `src/main.js` coordina interfaz, localStorage y navegación sin descartar estados pendientes.
 - Hashes: Inicio, Ingredientes, Productos, Ventas, Gastos, Resultados, Punto de equilibrio y Datos.
 
 ## Comprobaciones
-- `npm test`: 48/48; incluye Resultados, Punto de equilibrio y formatos de copia 1/2/3.
+- `npm test`: 56/56; incluye dashboard, Resultados, Punto de equilibrio y formatos de copia 1/2/3.
 - Build de Vite, `node --check` y `git diff --check` correctos.
 - Resultados comprobado con ventas, gastos, ambos, vacío, negativos y límites de mes/año; editar, eliminar y restaurar formato 1 recalculan.
 - Punto de equilibrio comprobado con margen positivo, cero y negativo; equilibrio no alcanzado, exacto y superado; cambio de mes y año; Atrás/Adelante y responsive.
-- Resultados no crea claves ni escribe derivados; solo existen las cuatro colecciones actuales.
+- Dashboard comprobado vacío, positivo/cero/negativo, equilibrio pendiente/alcanzado/superado/no calculable, productos archivados/inexistentes, empates, responsive y sin nuevas claves.
 
 ## Fuera de alcance
-- Sin gráficos, desglose diario mensual, prorrateo ni desglose fijo/variable en Resultados.
+- Sin gráficos, tendencias, previsiones, desglose diario mensual, prorrateo ni beneficio contable o fiscal.
 - No generar gastos futuros ni recurrencias automáticas.
-- Sin punto de equilibrio dashboard ni beneficio contable o fiscal.
 - Sin inventario, proveedores, PWA, backend ni sincronización.
 - El punto de equilibrio es una consulta y cálculo derivado; no guarda resultados en localStorage ni inventa datos.

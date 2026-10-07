@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "test": "node --test tests/calculations.test.js tests/product-comparison.test.js tests/sales.test.js tests/expenses.test.js tests/results.test.js tests/break-even.test.js tests/backup.test.js"
+    "test": "node --test tests/calculations.test.js tests/product-comparison.test.js tests/sales.test.js tests/expenses.test.js tests/results.test.js tests/break-even.test.js tests/dashboard.test.js tests/backup.test.js"
   },
   "devDependencies": {
     "vite": "^8.3.1"

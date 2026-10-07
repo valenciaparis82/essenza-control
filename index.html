@@ -32,15 +32,116 @@
       <main class="app-content">
       <section id="inicio" class="section-panel home-section" data-section-panel="inicio" aria-labelledby="home-title">
         <header class="page-header">
-          <h1 id="home-title" data-section-title tabindex="-1">Control de costes</h1>
-          <p class="intro">Convierte cada compra en decisiones claras: controla ingredientes y calcula el coste de tus productos.</p>
+          <h1 id="home-title" data-section-title tabindex="-1">Dashboard operativo</h1>
+          <p class="intro">Consulta cómo va la cafetería hoy y durante el mes actual, a partir de tus registros.</p>
         </header>
-        <div class="quick-access" aria-labelledby="quick-access-title">
+
+        <div id="dashboard-message" class="dashboard-message" role="status" aria-live="polite"></div>
+
+        <section class="dashboard-section dashboard-results-section" aria-labelledby="dashboard-today-title">
+          <div class="dashboard-section-heading">
+            <div>
+              <h2 id="dashboard-today-title">Hoy</h2>
+              <p id="dashboard-today-description">Resumen del día actual.</p>
+            </div>
+            <span class="derived-data-label">Datos históricos</span>
+          </div>
+          <dl class="dashboard-metrics">
+            <div><dt>Facturación</dt><dd id="dashboard-today-revenue">—</dd></div>
+            <div><dt>Coste de producto vendido</dt><dd id="dashboard-today-product-cost">—</dd></div>
+            <div><dt>Margen bruto</dt><dd id="dashboard-today-gross-margin">—</dd></div>
+            <div><dt>Gastos operativos</dt><dd id="dashboard-today-operating-expenses">—</dd></div>
+            <div class="dashboard-operating-result"><dt>Resultado operativo</dt><dd id="dashboard-today-operating-result">—</dd><p id="dashboard-today-result-status">Sin calcular</p></div>
+          </dl>
+        </section>
+
+        <section class="dashboard-section dashboard-results-section" aria-labelledby="dashboard-month-title">
+          <div class="dashboard-section-heading">
+            <div>
+              <h2 id="dashboard-month-title">Mes actual</h2>
+              <p id="dashboard-month-description">Resumen del mes natural actual.</p>
+            </div>
+            <span class="derived-data-label">Datos históricos</span>
+          </div>
+          <dl class="dashboard-metrics">
+            <div><dt>Facturación</dt><dd id="dashboard-month-revenue">—</dd></div>
+            <div><dt>Coste de producto vendido</dt><dd id="dashboard-month-product-cost">—</dd></div>
+            <div><dt>Margen bruto</dt><dd id="dashboard-month-gross-margin">—</dd></div>
+            <div><dt>Gastos operativos</dt><dd id="dashboard-month-operating-expenses">—</dd></div>
+            <div class="dashboard-operating-result"><dt>Resultado operativo</dt><dd id="dashboard-month-operating-result">—</dd><p id="dashboard-month-result-status">Sin calcular</p></div>
+          </dl>
+        </section>
+
+        <section class="dashboard-section dashboard-break-even" aria-labelledby="dashboard-break-even-title">
+          <div class="dashboard-section-heading">
+            <div>
+              <h2 id="dashboard-break-even-title">Punto de equilibrio</h2>
+              <p>Punto de equilibrio estimado según los datos registrados del mes actual.</p>
+            </div>
+            <span class="derived-data-label">Cálculo derivado</span>
+          </div>
+          <p id="dashboard-break-even-warning" class="dashboard-warning"></p>
+          <p id="dashboard-break-even-status" class="break-even-status is-neutral">No se puede determinar el estado.</p>
+          <dl class="dashboard-break-even-values">
+            <div><dt>Facturación necesaria</dt><dd id="dashboard-break-even-target">—</dd></div>
+            <div><dt>Facturación acumulada</dt><dd id="dashboard-break-even-revenue">—</dd></div>
+            <div><dt id="dashboard-break-even-difference-label">Diferencia</dt><dd id="dashboard-break-even-difference">—</dd></div>
+            <div><dt>Porcentaje alcanzado</dt><dd id="dashboard-break-even-attainment">—</dd></div>
+          </dl>
+          <p class="dashboard-disclaimer">Estimación operativa con IVA incluido, basada únicamente en ventas y gastos registrados. No es una cifra contable, fiscal ni definitiva.</p>
+        </section>
+
+        <section class="dashboard-section" aria-labelledby="dashboard-products-title">
+          <div class="dashboard-section-heading">
+            <div>
+              <h2 id="dashboard-products-title">Productos</h2>
+              <p>Una vista breve de la rentabilidad actual y las ventas históricas del mes.</p>
+            </div>
+          </div>
+          <div class="dashboard-product-grid">
+            <article class="dashboard-product-card">
+              <p class="dashboard-card-label">Indicador actual</p>
+              <h3>Mejor margen porcentual</h3>
+              <p id="dashboard-best-margin-product" class="dashboard-product-name">—</p>
+              <p id="dashboard-best-margin-value" class="dashboard-product-value">—</p>
+            </article>
+            <article class="dashboard-product-card">
+              <p class="dashboard-card-label">Indicador actual</p>
+              <h3>Food cost más alto</h3>
+              <p id="dashboard-highest-food-cost-product" class="dashboard-product-name">—</p>
+              <p id="dashboard-highest-food-cost-value" class="dashboard-product-value">—</p>
+              <p id="dashboard-highest-food-cost-status" class="dashboard-product-detail">—</p>
+            </article>
+            <article class="dashboard-product-card">
+              <p class="dashboard-card-label">Indicador actual</p>
+              <h3>Mayor margen por unidad</h3>
+              <p id="dashboard-highest-margin-product" class="dashboard-product-name">—</p>
+              <p id="dashboard-highest-margin-value" class="dashboard-product-value">—</p>
+            </article>
+            <article class="dashboard-product-card historical-product-card">
+              <p class="dashboard-card-label">Dato histórico del mes</p>
+              <h3>Producto más vendido</h3>
+              <p id="dashboard-most-sold-product" class="dashboard-product-name">—</p>
+              <p id="dashboard-most-sold-value" class="dashboard-product-value">—</p>
+              <p id="dashboard-most-sold-detail" class="dashboard-product-detail">—</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="quick-access" aria-labelledby="quick-access-title">
           <div class="quick-access-heading">
             <h2 id="quick-access-title">Accesos rápidos</h2>
             <p>Elige el área en la que quieres trabajar.</p>
           </div>
           <div class="quick-access-grid">
+            <a class="quick-access-link" href="#ventas" data-section-link="ventas">
+              <strong>Registrar venta</strong>
+              <span>Abre Ventas para registrar unidades vendidas.</span>
+            </a>
+            <a class="quick-access-link" href="#gastos" data-section-link="gastos">
+              <strong>Registrar gasto</strong>
+              <span>Abre Gastos para registrar un gasto operativo.</span>
+            </a>
             <a class="quick-access-link" href="#ingredientes" data-section-link="ingredientes">
               <strong>Ingredientes</strong>
               <span>Registra compras y consulta costes unitarios.</span>
@@ -48,14 +149,6 @@
             <a class="quick-access-link" href="#productos" data-section-link="productos">
               <strong>Productos</strong>
               <span>Gestiona recetas, márgenes y precios.</span>
-            </a>
-            <a class="quick-access-link" href="#ventas" data-section-link="ventas">
-              <strong>Ventas</strong>
-              <span>Registra ventas y revisa el resumen diario.</span>
-            </a>
-            <a class="quick-access-link" href="#gastos" data-section-link="gastos">
-              <strong>Gastos</strong>
-              <span>Registra gastos operativos y consulta el total diario.</span>
             </a>
             <a class="quick-access-link" href="#resultados" data-section-link="resultados">
               <strong>Resultados</strong>
