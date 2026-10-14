@@ -1,3 +1,5 @@
+// Las recetas trabajan siempre con una unidad base. Así se pueden sumar costes
+// de kg y g (o de l y ml) sin mezclar magnitudes incompatibles.
 export const purchaseUnits = {
   kg: { factor: 1000, base: 'g', type: 'mass' },
   g: { factor: 1, base: 'g', type: 'mass' },
@@ -13,6 +15,8 @@ export const foodCostThresholds = Object.freeze({
 });
 
 export function classifyFoodCost(foodCostPercent) {
+  // El semáforo es solo una orientación operativa. Recibe el valor completo,
+  // sin redondearlo antes, para no cambiar de color por la forma de mostrarlo.
   if (!Number.isFinite(foodCostPercent) || foodCostPercent < 0) {
     return { error: 'El food cost debe ser un porcentaje válido, igual o mayor que cero.' };
   }
@@ -38,6 +42,8 @@ export function classifyFoodCost(foodCostPercent) {
 }
 
 export function calculateIngredientCost({ name, price, quantity, unit }) {
+  // Convertimos primero la compra a su unidad interna y después dividimos el
+  // precio. Esto conserva precisión en ingredientes usados en poca cantidad.
   if (typeof name !== 'string' || !name.trim()) {
     return { error: 'Introduce el nombre del ingrediente.' };
   }
@@ -61,6 +67,8 @@ export function calculateIngredientCost({ name, price, quantity, unit }) {
 }
 
 export function calculateProductIndicators(product, ingredients) {
+  // Estos indicadores se derivan de la receta y de los precios actuales.
+  // No se guardan: al cambiar un ingrediente deben recalcularse solos.
   if (!product || !Number.isFinite(product.salePrice) || product.salePrice <= 0) {
     return { error: 'Introduce un precio de venta válido, mayor que cero.' };
   }
@@ -68,11 +76,15 @@ export function calculateProductIndicators(product, ingredients) {
     return { error: 'Añade al menos un ingrediente a la receta.' };
   }
 
+  // El mapa permite localizar cada ingrediente por su ID. La receta guarda
+  // referencias, no una copia del precio del ingrediente.
   const ingredientMap = new Map(ingredients.map((ingredient) => [ingredient.id, ingredient]));
   const usedIngredientIds = new Set();
   const lines = [];
   let totalCost = 0;
 
+  // Recorremos cada línea validando también que un ingrediente no se repita.
+  // Una receta duplicada daría un coste engañoso para una unidad vendida.
   for (const recipeLine of product.recipe) {
     if (!recipeLine || typeof recipeLine.ingredientId !== 'string' || !recipeLine.ingredientId
       || !Number.isFinite(recipeLine.quantity) || recipeLine.quantity <= 0) {
@@ -107,6 +119,8 @@ export function calculateProductIndicators(product, ingredients) {
   if (!Number.isFinite(totalCost)) {
     return { error: 'El coste total es demasiado grande para calcularlo.' };
   }
+  // Aplicamos las fórmulas con los valores completos; el redondeo se hace solo
+  // al mostrar el resultado en la interfaz.
   const marginAmount = product.salePrice - totalCost;
   const marginPercent = (marginAmount / product.salePrice) * 100;
   const foodCostPercent = (totalCost / product.salePrice) * 100;

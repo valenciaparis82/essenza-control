@@ -5,11 +5,15 @@ import { calculateOperatingResults } from './results.js';
 const textCollator = new Intl.Collator('es-ES', { sensitivity: 'base', numeric: true });
 
 function compareProducts(first, second) {
+  // Los desempates por nombre e ID evitan que dos valores iguales alternen
+  // visualmente entre actualizaciones.
   const nameComparison = textCollator.compare(first.product.name, second.product.name);
   return nameComparison || textCollator.compare(first.product.id, second.product.id);
 }
 
 function getBestProduct(rows, indicator) {
+  // El dashboard de productos usa costes actuales y excluye productos que no
+  // se pueden calcular; los datos históricos se muestran por otra vía.
   const calculableRows = rows.filter((row) => row.calculable);
   if (!calculableRows.length) return null;
 
@@ -20,6 +24,8 @@ function getBestProduct(rows, indicator) {
 }
 
 function getMostSoldProduct(sales, products, month) {
+  // Agrupamos ventas históricas por ID. Un producto archivado o eliminado sigue
+  // contando porque las ventas registradas no deben perder su significado.
   const soldUnitsByProduct = new Map();
   for (const sale of sales) {
     if (!sale.date.startsWith(`${month}-`)) continue;
@@ -49,6 +55,8 @@ function getMostSoldProduct(sales, products, month) {
 }
 
 export function createDashboardSummary({ ingredients, products, sales, expenses, today }) {
+  // El dashboard no persiste totales propios: compone cálculos existentes cada
+  // vez que se consulta para mantenerlo sincronizado con los datos guardados.
   if (typeof today !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(today)) {
     return { error: 'No se puede determinar la fecha actual del dashboard.' };
   }
@@ -66,6 +74,8 @@ export function createDashboardSummary({ ingredients, products, sales, expenses,
     return { error: 'Los productos o los ingredientes no tienen un formato válido.', month };
   }
 
+  // Separamos indicadores actuales de productos y resultados históricos de
+  // ventas/gastos para no mezclar dos momentos distintos de los datos.
   const currentProductRows = createProductComparisonRows(products, ingredients);
   const highestFoodCost = getBestProduct(currentProductRows, 'foodCostPercent');
   const mostSoldProduct = getMostSoldProduct(sales, products, month);

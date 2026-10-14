@@ -7,6 +7,8 @@
     <title>Essenza · Control de costes</title>
   </head>
   <body>
+    <!-- Estructura común: la barra lateral contiene la navegación y main alberga
+         paneles ya creados que JavaScript muestra u oculta sin recargar la página. -->
     <div class="app-shell">
       <aside class="app-sidebar">
         <div class="sidebar-header">
@@ -30,6 +32,8 @@
       </aside>
 
       <main class="app-content">
+      <!-- Dashboard: todos sus valores son derivados de ventas, gastos y datos
+           actuales; estos elementos empiezan vacíos para que JavaScript los complete. -->
       <section id="inicio" class="section-panel home-section" data-section-panel="inicio" aria-labelledby="home-title">
         <header class="page-header">
           <h1 id="home-title" data-section-title tabindex="-1">Dashboard operativo</h1>
@@ -163,9 +167,11 @@
               <span>Exporta o restaura una copia de seguridad.</span>
             </a>
           </div>
-        </div>
+        </section>
       </section>
 
+      <!-- Ingredientes: formulario de compra y listado se mantienen separados.
+           El atributo hidden permite que la navegación oculte este panel de forma accesible. -->
       <section id="ingredientes" class="section-panel ingredients-area" data-section-panel="ingredientes" aria-labelledby="ingredients-title" hidden>
         <div class="panel-heading">
           <h1 id="ingredients-title" data-section-title tabindex="-1">Ingredientes</h1>
@@ -226,6 +232,8 @@
       </div>
       </section>
 
+      <!-- Productos: una receta representa una unidad vendida y guarda referencias
+           a ingredientes. Los indicadores que se muestran son cálculos actuales. -->
       <section id="productos" class="section-panel products-area" data-section-panel="productos" aria-labelledby="products-title" hidden>
         <div class="section-heading">
           <div>
@@ -302,6 +310,8 @@
           </section>
         </div>
 
+        <!-- Comparativa: tabla generada por JavaScript a partir de productos activos.
+             La etiqueta visible aclara que sus costes no son datos históricos. -->
         <section class="profitability-comparison" aria-labelledby="comparison-title">
           <div class="comparison-heading">
             <div>
@@ -369,6 +379,8 @@
           <p class="comparison-disclaimer">Indicadores operativos con IVA incluido. El semáforo interpreta únicamente el food cost y no representa beneficio neto.</p>
         </section>
 
+        <!-- Simulador: compara un precio temporal con el precio guardado. Aplicar
+             el cambio es una acción independiente para evitar guardados accidentales. -->
         <section class="price-simulator" aria-labelledby="simulator-title">
           <div class="simulator-heading">
             <div>
@@ -434,6 +446,8 @@
         </section>
       </section>
 
+      <!-- Ventas: el formulario captura precio y coste unitarios en ese instante.
+           Por eso el listado y los resultados pueden conservar el historial real. -->
       <section id="ventas" class="section-panel sales-section" data-section-panel="ventas" aria-labelledby="sales-title" hidden>
         <div class="sales-heading">
           <div>
@@ -524,6 +538,8 @@
         </div>
       </section>
 
+      <!-- Gastos operativos: cada registro es independiente, incluso con la misma
+           fecha o concepto. El resumen diario se calcula, no se almacena. -->
       <section id="gastos" class="section-panel expenses-section" data-section-panel="gastos" aria-labelledby="expenses-title" hidden>
         <div class="expenses-heading">
           <div>
@@ -630,6 +646,8 @@
         </div>
       </section>
 
+      <!-- Resultados: consulta ventas históricas y gastos del periodo elegido.
+           Sus cinco totales se recalculan cada vez y no crean datos persistentes. -->
       <section id="resultados" class="section-panel results-section" data-section-panel="resultados" aria-labelledby="results-title" hidden>
         <div class="results-heading">
           <div>
@@ -680,6 +698,8 @@
         </section>
       </section>
 
+      <!-- Punto de equilibrio: presenta una estimación mensual derivada de los
+           registros existentes; no realiza previsiones ni guarda el resultado. -->
       <section id="equilibrio" class="section-panel break-even-section" data-section-panel="equilibrio" aria-labelledby="break-even-title" hidden>
         <div class="break-even-heading">
           <div>
@@ -742,6 +762,8 @@
         </section>
       </section>
 
+      <!-- Datos: la importación se divide en selección, validación y confirmación.
+           Así el archivo elegido no puede reemplazar datos por el mero hecho de abrirlo. -->
       <section id="datos" class="section-panel data-area" data-section-panel="datos" aria-labelledby="data-title" hidden>
         <div class="panel-heading">
           <h1 id="data-title" data-section-title tabindex="-1">Datos y copias de seguridad</h1>
@@ -779,11 +801,14 @@
       </section>
       </section>
 
+      </main>
+    </div>
+
+      <!-- Aviso permanente sobre el alcance local de localStorage y las copias manuales. -->
       <footer class="page-footer">
         <p class="note">Cálculo operativo con IVA incluido. Los datos se guardan en este navegador y dispositivo, para esta dirección de la aplicación. Puedes crear copias manuales en JSON; no hay sincronización y borrar los datos del navegador puede eliminarlos.</p>
       </footer>
-      </main>
-    </div>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
+()

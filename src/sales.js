@@ -3,6 +3,8 @@ import { getLocalDateString, isValidCalendarDate } from './date-utils.js';
 export { getLocalDateString, isValidCalendarDate } from './date-utils.js';
 
 export function getSaleValidationError(sale, { today = null } = {}) {
+  // Una venta debe ser autónoma: incluye sus importes históricos para que los
+  // cambios futuros de precio, receta o ingredientes no alteren el pasado.
   if (!sale || typeof sale !== 'object' || Array.isArray(sale)) return 'La venta no es válida.';
   if (typeof sale.id !== 'string' || !sale.id.trim()) return 'La venta no tiene un identificador válido.';
   if (!isValidCalendarDate(sale.date)) return 'Selecciona una fecha válida.';
@@ -15,6 +17,8 @@ export function getSaleValidationError(sale, { today = null } = {}) {
 }
 
 export function calculateSaleTotals(sale) {
+  // Los totales son derivados. Se calculan cuando se necesitan y no se guardan
+  // para evitar tener datos duplicados que puedan dejar de coincidir.
   const error = getSaleValidationError(sale);
   if (error) return { error };
 
@@ -28,6 +32,8 @@ export function calculateSaleTotals(sale) {
 }
 
 export function summarizeSalesByDate(sales, date) {
+  // Conservamos los registros separados aunque sean del mismo producto y día,
+  // porque pueden corresponder a operaciones reales diferentes.
   const records = sales.filter((sale) => sale.date === date);
   let units = 0;
   let revenue = 0;

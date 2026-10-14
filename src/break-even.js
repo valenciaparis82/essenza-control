@@ -1,6 +1,8 @@
 import { calculateOperatingResults } from './results.js';
 
 export function calculateMonthlyBreakEven(sales, expenses, month) {
+  // Reutilizamos Resultados para no duplicar las fórmulas de ventas y gastos.
+  // El equilibrio es mensual y se calcula solo con lo ya registrado.
   const monthlyResults = calculateOperatingResults(sales, expenses, {
     period: 'month',
     value: month,
@@ -15,12 +17,16 @@ export function calculateMonthlyBreakEven(sales, expenses, month) {
     saleCount,
     expenseCount,
   } = monthlyResults;
+  // El margen de contribución es lo disponible para cubrir gastos fijos tras
+  // descontar el coste vendido y los gastos variables.
   const contributionMargin = revenue - productCost - variableExpenses;
 
   if (!Number.isFinite(contributionMargin)) {
     return { error: 'El punto de equilibrio es demasiado grande para calcularlo.' };
   }
 
+  // Devolvemos una estructura completa incluso cuando no hay cálculo posible.
+  // Así la interfaz puede explicar el motivo sin inventar cifras.
   const baseResult = {
     revenue,
     productCost,
@@ -38,6 +44,8 @@ export function calculateMonthlyBreakEven(sales, expenses, month) {
     expenseCount,
   };
 
+  // Sin ingresos no existe un porcentaje de contribución fiable que permita
+  // estimar la facturación necesaria para el equilibrio.
   if (revenue === 0) return baseResult;
 
   const contributionMarginPercent = contributionMargin / revenue;
@@ -55,6 +63,7 @@ export function calculateMonthlyBreakEven(sales, expenses, month) {
     };
   }
 
+  // Facturación necesaria = gastos fijos / margen de contribución decimal.
   const breakEvenRevenue = fixedExpenses / contributionMarginPercent;
   const difference = revenue - breakEvenRevenue;
   if (![breakEvenRevenue, difference].every(Number.isFinite)) {

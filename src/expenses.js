@@ -20,6 +20,8 @@ const expenseTypeSet = new Set(EXPENSE_TYPES);
 const textCollator = new Intl.Collator('es-ES', { sensitivity: 'base', numeric: true });
 
 export function getExpenseValidationError(expense, { today = null } = {}) {
+  // Los gastos fijos se registran manualmente; marcar uno como fijo no crea
+  // recurrencias automáticas ni futuros registros.
   if (!expense || typeof expense !== 'object' || Array.isArray(expense)) return 'El gasto no es válido.';
   if (typeof expense.id !== 'string' || !expense.id.trim()) return 'El gasto no tiene un identificador válido.';
   if (!isValidCalendarDate(expense.date)) return 'Selecciona una fecha válida.';
@@ -32,6 +34,7 @@ export function getExpenseValidationError(expense, { today = null } = {}) {
 }
 
 export function summarizeExpensesByDate(expenses, date) {
+  // El total diario es un dato derivado, no una clave guardada en localStorage.
   if (!Array.isArray(expenses) || !isValidCalendarDate(date)) {
     return { error: 'No se puede preparar el resumen para esta fecha.', records: [] };
   }
@@ -49,6 +52,8 @@ export function summarizeExpensesByDate(expenses, date) {
 }
 
 export function sortExpenses(expenses, { sortBy = 'amount', direction = 'desc' } = {}) {
+  // Ordenamos una copia para no modificar el orden original de los registros.
+  // Los desempates hacen que el resultado sea estable y predecible.
   const validSorts = new Set(['amount', 'category', 'description', 'type']);
   if (!Array.isArray(expenses) || !validSorts.has(sortBy) || !['asc', 'desc'].includes(direction)) {
     throw new Error('La ordenación de gastos no es válida.');

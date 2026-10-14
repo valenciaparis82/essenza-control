@@ -11,6 +11,8 @@ const FIRST_BACKUP_FORMAT_VERSION = 1;
 const SALES_BACKUP_FORMAT_VERSION = 2;
 
 function hasExactKeys(value, expectedKeys) {
+  // Las copias usan una estructura cerrada para detectar archivos incompletos
+  // o incompatibles antes de que puedan sustituir datos locales.
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
   const keys = Object.keys(value);
   return keys.length === expectedKeys.length
@@ -18,6 +20,8 @@ function hasExactKeys(value, expectedKeys) {
 }
 
 function canonicalIngredient(ingredient) {
+  // Creamos una versión explícita de cada dato para exportar solo los campos
+  // admitidos, sin incluir indicadores derivados ni propiedades temporales.
   return {
     id: ingredient.id,
     name: ingredient.name,
@@ -43,6 +47,8 @@ function canonicalProduct(product) {
 }
 
 function canonicalSale(sale) {
+  // La copia incluye los importes históricos de cada venta, no solo el ID del
+  // producto, para poder reconstruir correctamente resultados pasados.
   return {
     id: sale.id,
     date: sale.date,
@@ -65,6 +71,8 @@ function canonicalExpense(expense) {
 }
 
 export function createBackupDocument(ingredients, products, sales, expenses, exportedAt = new Date()) {
+  // Validamos antes y después de formar el documento. Así no se descarga una
+  // copia que la propia aplicación no aceptaría al importar.
   validateDataSet({ ingredients, products, sales, expenses });
   const document = {
     application: BACKUP_APPLICATION,
@@ -82,6 +90,8 @@ export function createBackupDocument(ingredients, products, sales, expenses, exp
 }
 
 function validateExportDate(exportedAtValue) {
+  // Comparamos de nuevo ISO para rechazar fechas que JavaScript normalizaría
+  // silenciosamente y que no pertenecen al formato de copia.
   const exportedAt = typeof exportedAtValue === 'string' ? new Date(exportedAtValue) : null;
   if (!exportedAt || Number.isNaN(exportedAt.getTime())
     || exportedAt.toISOString() !== exportedAtValue) {
@@ -90,6 +100,8 @@ function validateExportDate(exportedAtValue) {
 }
 
 export function validateBackupDocument(document) {
+  // Primero comprobamos identidad, versión y forma del archivo; solo después
+  // validamos sus datos. Esto permite importar de forma segura formatos 1, 2 y 3.
   if (!hasExactKeys(document, ['application', 'formatVersion', 'exportedAt', 'data'])) {
     throw new Error('El archivo no tiene la estructura exacta de una copia de Essenza Control.');
   }
@@ -121,6 +133,8 @@ export function validateBackupDocument(document) {
 }
 
 export function parseBackupText(text) {
+  // JSON.parse solo transforma texto en datos. La validación posterior decide
+  // si esos datos son realmente una copia compatible de Essenza Control.
   let document;
   try {
     document = JSON.parse(text);
@@ -128,6 +142,8 @@ export function parseBackupText(text) {
     throw new Error('El archivo no contiene un JSON válido.');
   }
   validateBackupDocument(document);
+  // Los formatos antiguos no contenían todas las colecciones. Las completamos
+  // con listas vacías para que la interfaz use siempre la misma estructura.
   const hasSales = document.formatVersion >= SALES_BACKUP_FORMAT_VERSION;
   const hasExpenses = document.formatVersion >= BACKUP_FORMAT_VERSION;
   const data = {
@@ -163,11 +179,15 @@ export function parseBackupText(text) {
 }
 
 function restoreRawValue(storage, key, value) {
+  // Esta pequeña función restaura exactamente el valor previo, incluso cuando
+  // la clave no existía antes de intentar importar la copia.
   if (value === null) storage.removeItem(key);
   else storage.setItem(key, value);
 }
 
 export function replaceStoredData(storage, keys, data, expectedRawValues) {
+  // Restaurar reemplaza todas las colecciones como una única operación lógica.
+  // Verificamos que nadie las haya cambiado desde que se seleccionó el archivo.
   validateDataSet(data, { strict: true });
   const names = ['ingredients', 'products', 'sales', 'expenses'];
   const currentValues = Object.fromEntries(names.map((name) => [name, storage.getItem(keys[name])]));
@@ -177,6 +197,8 @@ export function replaceStoredData(storage, keys, data, expectedRawValues) {
 
   const serializedValues = Object.fromEntries(names.map((name) => [name, JSON.stringify(data[name])]));
   try {
+    // Tras cada escritura comprobamos el resultado. Si algo falla, deshacemos
+    // lo ya escrito para conservar los datos anteriores en vez de una mezcla.
     for (const name of names) storage.setItem(keys[name], serializedValues[name]);
     if (names.some((name) => storage.getItem(keys[name]) !== serializedValues[name])) {
       throw new Error('No se pudo comprobar la escritura completa.');

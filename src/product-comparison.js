@@ -15,6 +15,8 @@ const textCollator = new Intl.Collator('es-ES', { sensitivity: 'base', numeric: 
 const statusOrder = Object.freeze({ green: 1, amber: 2, red: 3 });
 
 export function createProductComparisonRows(products, ingredients) {
+  // Solo aparecen productos activos. Los indicadores se recalculan ahora con
+  // ingredientes actuales, por lo que no se almacenan dentro del producto.
   return products
     .filter((product) => product.archived !== true)
     .map((product) => {
@@ -34,6 +36,8 @@ export function createProductComparisonRows(products, ingredients) {
 }
 
 function getSortValue(row, sortBy) {
+  // Centralizar estos valores evita repetir la relación entre cada columna y
+  // el dato real que se usa para ordenar.
   const values = {
     product: row.product.name,
     category: row.product.category,
@@ -52,6 +56,8 @@ export function filterAndSortProductComparisonRows(rows, {
   sortBy = 'foodCost',
   direction = 'desc',
 } = {}) {
+  // Si llega una opción no reconocida, usamos el orden inicial previsto en vez
+  // de fallar al renderizar la comparativa.
   const validSortBy = comparisonSortFields.includes(sortBy) ? sortBy : 'foodCost';
   const directionFactor = direction === 'asc' ? 1 : -1;
   const filteredRows = category === 'all'

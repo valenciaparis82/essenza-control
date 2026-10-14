@@ -15,14 +15,19 @@ export const PRODUCT_CATEGORIES = Object.freeze([
 const productCategorySet = new Set(PRODUCT_CATEGORIES);
 
 export function normalizeName(name) {
+  // La comparación ignora mayúsculas, minúsculas y particularidades del español
+  // para impedir nombres duplicados que visualmente parecen el mismo.
   return name.trim().toLocaleLowerCase('es-ES');
 }
 
 function isPlainObject(value) {
+  // Una colección importada debe contener objetos simples, no arrays ni null.
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function hasOnlyKeys(value, requiredKeys, optionalKeys = []) {
+  // En modo estricto rechazamos campos desconocidos: una copia tiene un formato
+  // definido y no debe introducir datos inesperados en localStorage.
   const allowedKeys = new Set([...requiredKeys, ...optionalKeys]);
   const keys = Object.keys(value);
   return requiredKeys.every((key) => Object.hasOwn(value, key))
@@ -30,6 +35,8 @@ function hasOnlyKeys(value, requiredKeys, optionalKeys = []) {
 }
 
 export function validateIngredients(ingredients, { strict = false } = {}) {
+  // Validar antes de usar o restaurar impide que datos incompletos rompan los
+  // cálculos posteriores. Los ingredientes antiguos sin archived son activos.
   if (!Array.isArray(ingredients)) throw new Error('La lista de ingredientes no es válida.');
   const ids = new Set();
   const names = new Set();
@@ -54,6 +61,8 @@ export function validateIngredients(ingredients, { strict = false } = {}) {
 }
 
 export function validateProducts(products, { strict = false } = {}) {
+  // Validamos la estructura de la receta, pero permitimos referencias ausentes:
+  // se conservan para avisar que el producto no es calculable, no se corrigen.
   if (!Array.isArray(products)) throw new Error('La lista de productos no es válida.');
   const ids = new Set();
   const names = new Set();
@@ -85,6 +94,8 @@ export function validateProducts(products, { strict = false } = {}) {
 }
 
 export function validateSales(sales, { strict = false } = {}) {
+  // Las ventas no exigen que el producto exista actualmente, pues guardan sus
+  // propios importes históricos y pueden sobrevivir a un producto eliminado.
   if (!Array.isArray(sales)) throw new Error('La lista de ventas no es válida.');
   const ids = new Set();
 
@@ -103,6 +114,8 @@ export function validateSales(sales, { strict = false } = {}) {
 }
 
 export function validateExpenses(expenses, { strict = false } = {}) {
+  // Cada gasto tiene ID propio; se permiten importes o conceptos repetidos si
+  // representan operaciones reales separadas.
   if (!Array.isArray(expenses)) throw new Error('La lista de gastos no es válida.');
   const ids = new Set();
 
@@ -120,6 +133,8 @@ export function validateExpenses(expenses, { strict = false } = {}) {
 }
 
 export function validateDataSet(data, { strict = false } = {}) {
+  // Es la puerta de entrada común para comprobar un conjunto completo antes
+  // de crear una copia o reemplazar las cuatro colecciones almacenadas.
   if (!isPlainObject(data)
     || (strict && !hasOnlyKeys(data, ['ingredients', 'products', 'sales', 'expenses']))) {
     throw new Error('La estructura de datos de la copia no es válida.');

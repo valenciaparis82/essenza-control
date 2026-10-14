@@ -38,6 +38,9 @@ import { calculateOperatingResults } from './results.js';
 import { calculateMonthlyBreakEven } from './break-even.js';
 import { createDashboardSummary } from './dashboard.js';
 
+// Este archivo conecta la interfaz HTML con la lógica de negocio de los módulos.
+// Aquí se muestran datos y se atienden eventos; las fórmulas viven fuera para no
+// duplicarlas entre pantallas.
 function formatNumber(value) {
   // Los valores diminutos usan notación científica para no mostrarse como cero.
   return new Intl.NumberFormat('es-ES', {
@@ -58,6 +61,8 @@ const sectionNames = {
   equilibrio: 'Punto de equilibrio',
   datos: 'Datos',
 };
+// Guardamos referencias a elementos ya presentes en el HTML. No se crean
+// pantallas nuevas al navegar: solo se muestra u oculta cada panel existente.
 const sectionPanels = [...document.querySelectorAll('[data-section-panel]')];
 const sectionLinks = [...document.querySelectorAll('[data-section-link]')];
 const navigationLinks = [...document.querySelectorAll('[data-navigation-link]')];
@@ -66,11 +71,15 @@ const primaryNavigation = document.querySelector('#primary-navigation');
 const mobileCurrentSection = document.querySelector('#mobile-current-section');
 
 function getSectionFromHash() {
+  // El hash forma parte de la URL, por ejemplo #ventas. Permite navegar sin
+  // recargar la aplicación y da una sección segura si el hash es desconocido.
   const requestedSection = window.location.hash.slice(1).toLowerCase();
   return Object.hasOwn(sectionNames, requestedSection) ? requestedSection : 'inicio';
 }
 
 function closeMobileNavigation({ returnFocus = false } = {}) {
+  // Además de ocultar el menú, mantenemos aria-expanded y el foco coherentes
+  // para que sea comprensible al usar teclado o lector de pantalla.
   primaryNavigation.classList.remove('is-open');
   mobileNavigationToggle.setAttribute('aria-expanded', 'false');
   mobileNavigationToggle.textContent = 'Abrir menú';
@@ -78,6 +87,8 @@ function closeMobileNavigation({ returnFocus = false } = {}) {
 }
 
 function activateSection(sectionId, { moveFocus = false } = {}) {
+  // Cambiar de sección no reconstruye formularios ni guarda datos: así una
+  // edición pendiente no se pierde simplemente por navegar.
   const activeSectionId = Object.hasOwn(sectionNames, sectionId) ? sectionId : 'inicio';
   for (const panel of sectionPanels) {
     panel.hidden = panel.dataset.sectionPanel !== activeSectionId;
@@ -100,12 +111,15 @@ function activateSection(sectionId, { moveFocus = false } = {}) {
 }
 
 function initializeNavigation() {
+  // Normalizamos la URL inicial y atendemos hashchange para que Atrás/Adelante
+  // del navegador sigan funcionando dentro de la aplicación.
   const activeSectionId = getSectionFromHash();
   activateSection(activeSectionId);
   if (window.location.hash !== `#${activeSectionId}`) {
     window.history.replaceState(null, '', `#${activeSectionId}`);
   }
 
+  // El menú móvil es un desplegable accesible, independiente de la navegación.
   mobileNavigationToggle.addEventListener('click', () => {
     const willOpen = mobileNavigationToggle.getAttribute('aria-expanded') !== 'true';
     primaryNavigation.classList.toggle('is-open', willOpen);
@@ -321,6 +335,8 @@ const storageKeys = {
   sales: salesStorageKey,
   expenses: expensesStorageKey,
 };
+// Este estado existe solo mientras la página está abierta. No va a localStorage:
+// representa ediciones, vistas previas y copias pendientes, no datos del negocio.
 let editingIngredientId = null;
 let editingOriginalData = null;
 let editingProductId = null;
@@ -340,6 +356,8 @@ let expenseFormDirty = false;
 let pendingBackup = null;
 
 function getStoredData(ingredient) {
+  // Comparamos únicamente campos que se pueden editar. El ID identifica al
+  // ingrediente y no debe influir al detectar cambios desde otra pestaña.
   return {
     name: ingredient.name,
     price: ingredient.price,
@@ -350,10 +368,13 @@ function getStoredData(ingredient) {
 }
 
 function sameStoredData(first, second) {
+  // JSON permite comparar una instantánea sencilla sin guardar una marca extra.
   return JSON.stringify(getStoredData(first)) === JSON.stringify(getStoredData(second));
 }
 
 function readIngredients() {
+  // localStorage solo almacena texto. Al leer convertimos el JSON y validamos
+  // antes de dejar que la interfaz trabaje con los datos recuperados.
   const stored = localStorage.getItem(storageKey);
   if (stored === null) return [];
   const ingredients = JSON.parse(stored);
@@ -361,10 +382,12 @@ function readIngredients() {
 }
 
 function writeIngredients(ingredients) {
+  // Persistimos para conservar ingredientes al cerrar o recargar el navegador.
   localStorage.setItem(storageKey, JSON.stringify(ingredients));
 }
 
 function readProducts() {
+  // Cada colección usa una clave propia para poder validarla de forma aislada.
   const stored = localStorage.getItem(productStorageKey);
   if (stored === null) return [];
   const products = JSON.parse(stored);
@@ -376,6 +399,8 @@ function writeProducts(products) {
 }
 
 function readSales() {
+  // Las ventas se leen completas porque sus importes históricos forman parte
+  // del registro y no pueden regenerarse desde la receta actual.
   const stored = localStorage.getItem(salesStorageKey);
   if (stored === null) return [];
   const sales = JSON.parse(stored);
@@ -398,6 +423,8 @@ function writeExpenses(expenses) {
 }
 
 function resetDashboardOutputs(message) {
+  // Ante un error limpiamos cifras anteriores para no presentar como actual un
+  // resultado que quizá pertenece a datos que ya no se pudieron recuperar.
   for (const period of Object.values(dashboardOutputs)) {
     for (const output of Object.values(period)) {
       output.textContent = '—';
@@ -418,6 +445,7 @@ function resetDashboardOutputs(message) {
 }
 
 function renderDashboardPeriod(outputs, results) {
+  // Esta función solo transforma un resumen ya calculado en texto visible.
   outputs.revenue.textContent = `${formatNumber(results.revenue)} €`;
   outputs.productCost.textContent = `${formatNumber(results.productCost)} €`;
   outputs.grossMargin.textContent = `${formatNumber(results.grossMargin)} €`;
@@ -445,6 +473,8 @@ function renderDashboardProductMetric(outputs, row, value, detail = '') {
 }
 
 function renderDashboardBreakEven(summary, month) {
+  // El dashboard no proyecta el final del mes: describe solo los registros que
+  // existen ahora, por eso muestra una advertencia para el mes en curso.
   dashboardBreakEvenWarning.textContent = `Mes en curso. El cálculo utiliza únicamente las ventas y los gastos registrados hasta este momento. Los gastos todavía no registrados pueden modificar el punto de equilibrio; no se proyectan ventas ni gastos hasta final de mes.`;
   dashboardBreakEvenRevenue.textContent = `${formatNumber(summary.actualRevenue)} €`;
   if (summary.status === 'not-calculable') {
@@ -482,6 +512,8 @@ function renderDashboardBreakEven(summary, month) {
 }
 
 function renderDashboard(summary) {
+  // El resumen ya separa datos históricos y costes actuales; aquí respetamos
+  // esa separación al mostrar cada tarjeta.
   if (summary.error) {
     resetDashboardOutputs(`No se puede actualizar el dashboard: ${summary.error}`);
     return;
@@ -529,6 +561,8 @@ function renderDashboard(summary) {
 }
 
 function refreshDashboard() {
+  // Releer desde almacenamiento evita mantener una copia antigua en memoria.
+  // Si falla, no escribimos nada y mostramos un estado seguro sin cifras.
   try {
     renderDashboard(createDashboardSummary({
       ingredients: readIngredients(),
@@ -545,6 +579,8 @@ function refreshDashboard() {
 }
 
 function getStoredProductData(product) {
+  // Igual que con ingredientes, esta instantánea detecta cambios concurrentes
+  // sin comparar valores derivados como el coste o el food cost.
   return {
     name: product.name,
     category: product.category,
@@ -559,6 +595,8 @@ function sameStoredProductData(first, second) {
 }
 
 function cloneProduct(product) {
+  // La receta es un array anidado. Lo copiamos también para que una simulación
+  // o edición temporal no pueda modificar accidentalmente el producto guardado.
   return {
     ...product,
     recipe: product.recipe.map((line) => ({ ...line })),
@@ -566,6 +604,8 @@ function cloneProduct(product) {
 }
 
 function getSimulatorIngredientSnapshot(product, ingredients) {
+  // La simulación depende de los ingredientes de la receta. Esta firma detecta
+  // si precio, cantidad o unidad cambiaron mientras la simulación estaba abierta.
   const ingredientMap = new Map(ingredients.map((ingredient) => [ingredient.id, ingredient]));
   return JSON.stringify(product.recipe.map((line) => {
     const ingredient = ingredientMap.get(line.ingredientId);
@@ -587,6 +627,8 @@ function resetSimulatorOutputs(outputs, description) {
 }
 
 function renderFoodCostStatus(element, foodCostPercent) {
+  // El color siempre se acompaña de texto para que el semáforo no dependa solo
+  // de la percepción visual.
   const status = classifyFoodCost(foodCostPercent);
   element.className = `food-cost-status is-${status.key}`;
   element.querySelector('.status-name').textContent = status.label;
@@ -605,6 +647,8 @@ function renderSimulatorOutputs(outputs, price, result) {
 }
 
 function clearPriceSimulator(message = 'Selecciona un producto para empezar.') {
+  // Limpiar una simulación descarta solo su estado temporal; nunca modifica el
+  // precio almacenado de ningún producto.
   simulatorProductData = null;
   simulatorOriginalProductData = null;
   simulatorIngredientSnapshot = null;
@@ -620,6 +664,8 @@ function clearPriceSimulator(message = 'Selecciona un producto para empezar.') {
 }
 
 function updateSimulatorCalculation(ingredients) {
+  // La simulación crea un producto temporal con otro precio. No se guarda hasta
+  // que la persona confirma explícitamente el cambio con el botón de aplicar.
   if (!simulatorProductData) {
     clearPriceSimulator();
     return;
@@ -680,6 +726,8 @@ function loadSimulatorProduct(product, ingredients, { preservePrice = null } = {
 }
 
 function refreshPriceSimulator(ingredients) {
+  // Solo los productos activos se pueden simular. Conservamos el precio escrito
+  // si es posible para no perder una simulación al actualizar otros elementos.
   let products;
   try {
     products = readProducts();
@@ -733,6 +781,8 @@ function createActionButton(text, action, ingredientId, secondary = false) {
 }
 
 function renderIngredients(ingredients) {
+  // Renderizar sustituye únicamente el listado visual; no altera la colección
+  // recibida ni escribe en localStorage.
   ingredientList.replaceChildren();
   const showArchived = showArchivedInput.checked;
   const visibleIngredients = ingredients.filter((ingredient) => showArchived || ingredient.archived !== true);
@@ -781,6 +831,8 @@ function renderIngredients(ingredients) {
 }
 
 function renderStoredIngredients() {
+  // Los errores de lectura se contienen aquí para que un dato dañado no rompa
+  // el resto de pantallas ni provoque una sobrescritura accidental.
   try {
     renderIngredients(readIngredients());
     return true;
@@ -792,6 +844,8 @@ function renderStoredIngredients() {
 }
 
 function readFormIngredient() {
+  // valueAsNumber convierte lo escrito en número y deja NaN si no es válido;
+  // la función de cálculo centralizada se ocupa después de validarlo.
   return {
     name: form.elements.name.value.trim(),
     price: form.elements.price.valueAsNumber,
@@ -806,6 +860,8 @@ function resetResult() {
 }
 
 function finishEditing({ focus = true } = {}) {
+  // Cancelar o terminar una edición restaura el formulario, pero no toca datos
+  // persistidos: guardar es la única acción que escribe el ingrediente.
   editingIngredientId = null;
   editingOriginalData = null;
   form.reset();
@@ -817,6 +873,8 @@ function finishEditing({ focus = true } = {}) {
 }
 
 function updateResult() {
+  // Ofrecemos una vista previa del coste mientras se escribe. Es informativa y
+  // no crea ni actualiza ningún ingrediente todavía.
   const ingredient = readFormIngredient();
   const result = calculateIngredientCost(ingredient);
 
@@ -853,11 +911,14 @@ function startEditing(ingredient) {
 }
 
 function confirmDiscardEdit() {
+  // Pedimos confirmación antes de sustituir una edición abierta por otra acción.
   return editingIngredientId === null
     || window.confirm('Hay una edición sin guardar. ¿Quieres descartarla?');
 }
 
 function hasDuplicateName(ingredients, ingredient, ignoredId = null) {
+  // Los nombres reservados incluyen archivados para evitar ambigüedad al
+  // restaurarlos más adelante.
   return ingredients.some((saved) => saved.id !== ignoredId
     && normalizeName(saved.name) === normalizeName(ingredient.name));
 }
@@ -887,6 +948,8 @@ form.addEventListener('submit', (event) => {
     return;
   }
 
+  // Al editar comprobamos la instantánea original. Es una protección sencilla
+  // contra sobrescribir cambios que otra pestaña guardó entretanto.
   if (editingIngredientId !== null) {
     const ingredientIndex = ingredients.findIndex((saved) => saved.id === editingIngredientId);
     if (ingredientIndex === -1 || !sameStoredData(ingredients[ingredientIndex], editingOriginalData)) {
@@ -934,6 +997,8 @@ cancelEditButton.addEventListener('click', () => {
 showArchivedInput.addEventListener('change', renderStoredIngredients);
 
 ingredientList.addEventListener('click', (event) => {
+  // Delegación de eventos: un único listener gestiona botones creados al
+  // renderizar cada ingrediente, incluso tras actualizar el listado.
   const button = event.target.closest('button[data-action]');
   if (!button) return;
   const { action, ingredientId } = button.dataset;
@@ -962,6 +1027,8 @@ ingredientList.addEventListener('click', (event) => {
     return;
   }
 
+  // Archivar conserva el mismo ID y todos los datos. No se borra porque una
+  // receta existente puede seguir haciendo referencia a este ingrediente.
   if (action === 'archive') {
     const isBeingEdited = editingIngredientId === ingredient.id;
     const message = isBeingEdited
@@ -996,6 +1063,8 @@ ingredientList.addEventListener('click', (event) => {
 });
 
 function resetProductIndicators(message = 'Completa el producto y su receta para calcularlos.') {
+  // Al no poder calcular, quitamos valores anteriores para no confundirlos con
+  // el estado actual del formulario.
   productCalculationMessage.textContent = message;
   productCostOutput.textContent = '—';
   productMarginOutput.textContent = '—';
@@ -1006,6 +1075,8 @@ function resetProductIndicators(message = 'Completa el producto y su receta para
 }
 
 function getProductFormData() {
+  // La receta guarda solo ID de ingrediente y cantidad base. Sus costes se
+  // obtienen después desde los ingredientes actuales, nunca se copian aquí.
   return {
     name: productForm.elements.productName.value.trim(),
     category: productForm.elements.category.value,
@@ -1023,6 +1094,8 @@ function hasDuplicateProductName(products, product, ignoredId = null) {
 }
 
 function getOriginalArchivedIngredientIds(ingredients) {
+  // Al editar se permite conservar un ingrediente que se archivó después,
+  // pero no añadirlo de nuevo a la receta.
   if (!editingOriginalProductData) return new Set();
   const ingredientMap = new Map(ingredients.map((ingredient) => [ingredient.id, ingredient]));
   return new Set(editingOriginalProductData.recipe
@@ -1047,6 +1120,8 @@ function getActiveIngredients(ingredients) {
 }
 
 function updateRecipeSelectOptions(ingredients) {
+  // Desactivamos ingredientes ya elegidos para que una receta no los repita.
+  // Las referencias archivadas o ausentes se muestran solo para conservarlas.
   const selects = [...recipeLines.querySelectorAll('.recipe-ingredient')];
   const selectedIds = selects.map((select) => select.value).filter(Boolean);
   const ingredientMap = new Map(ingredients.map((ingredient) => [ingredient.id, ingredient]));
@@ -1082,6 +1157,8 @@ function updateRecipeSelectOptions(ingredients) {
 }
 
 function updateRecipeLineDetails(ingredients) {
+  // Cada línea muestra una ayuda visual, pero el cálculo final sigue pasando
+  // por el módulo de cálculos para aplicar las mismas validaciones.
   const ingredientMap = new Map(ingredients.map((ingredient) => [ingredient.id, ingredient]));
   const preservedArchivedIds = getOriginalArchivedIngredientIds(ingredients);
   for (const line of recipeLines.querySelectorAll('.recipe-line')) {
@@ -1111,6 +1188,8 @@ function updateRecipeLineDetails(ingredients) {
 }
 
 function createRecipeLine(ingredients, initialRecipeLine = null) {
+  // Una línea nueva elige un ingrediente activo libre. Al editar, la opción
+  // temporal preserva una referencia histórica aunque ya no pueda seleccionarse.
   const activeIngredients = getActiveIngredients(ingredients);
   const selectedIds = [...recipeLines.querySelectorAll('.recipe-ingredient')]
     .map((select) => select.value)
@@ -1158,6 +1237,8 @@ function createRecipeLine(ingredients, initialRecipeLine = null) {
 }
 
 function updateAddRecipeLineButton(ingredients) {
+  // No permitimos crear líneas vacías cuando no quedan ingredientes activos
+  // distintos que se puedan añadir.
   const activeIngredientIds = new Set(getActiveIngredients(ingredients).map((ingredient) => ingredient.id));
   const selectedActiveCount = new Set([...recipeLines.querySelectorAll('.recipe-ingredient')]
     .map((select) => select.value)
@@ -1167,6 +1248,8 @@ function updateAddRecipeLineButton(ingredients) {
 }
 
 function updateProductCalculation(ingredients) {
+  // Los indicadores son una vista previa actual de una unidad vendida. No se
+  // guardan en el producto porque dependen de precios de ingredientes variables.
   updateRecipeLineDetails(ingredients);
   const product = getProductFormData();
   const result = calculateProductIndicators(product, ingredients);
@@ -1226,6 +1309,8 @@ function createNotCalculableCell(label) {
 }
 
 function renderProductComparison(products, ingredients) {
+  // La comparativa usa filas derivadas y ordenadas. Los productos no calculables
+  // se mantienen visibles para indicar qué receta necesita revisión.
   comparisonBody.replaceChildren();
   const rows = createProductComparisonRows(products, ingredients);
   const visibleRows = filterAndSortProductComparisonRows(rows, {
@@ -1322,6 +1407,8 @@ function createProductActionButton(text, action, productId, secondary = false) {
 }
 
 function renderProducts(products, ingredients) {
+  // El listado explica recetas incluso si falta una referencia. Así se puede
+  // localizar el problema sin ocultar un producto que todavía existe.
   productList.replaceChildren();
   const showArchived = showArchivedProductsInput.checked;
   const visibleProducts = products.filter((product) => showArchived || product.archived !== true);
@@ -1412,6 +1499,8 @@ function renderStoredProducts(ingredients) {
 }
 
 function finishProductEditing(ingredients, { focus = true } = {}) {
+  // Finalizar una edición restaura la interfaz y actualiza sus dependencias:
+  // comparativa, simulador y ventas pueden necesitar los datos nuevos.
   editingProductId = null;
   editingOriginalProductData = null;
   productForm.reset();
@@ -1448,6 +1537,8 @@ function startEditingProduct(product, ingredients) {
 }
 
 function refreshProductFeatures(knownIngredients = null) {
+  // Productos, comparativa, simulador y selector de ventas comparten datos de
+  // ingredientes. Los actualizamos juntos para evitar pantallas incoherentes.
   let ingredients = knownIngredients;
   if (!ingredients) {
     try {
@@ -1484,6 +1575,8 @@ addRecipeLineButton.addEventListener('click', () => {
 });
 
 recipeLines.addEventListener('input', () => {
+  // Al cambiar una línea recalculamos la vista previa y las opciones disponibles
+  // sin guardar la receta hasta que se envía el formulario.
   try {
     const ingredients = readIngredients();
     updateRecipeSelectOptions(ingredients);
@@ -1556,6 +1649,8 @@ for (const control of [comparisonCategoryInput, comparisonSortInput, comparisonD
 }
 
 simulatorProductInput.addEventListener('change', () => {
+  // Cambiar de producto puede descartar una simulación temporal, por eso se
+  // consulta antes si había un precio escrito sin aplicar.
   const requestedProductId = simulatorProductInput.value;
   if (simulatorProductData && requestedProductId !== simulatorProductData.id && simulatorDirty
     && !window.confirm('Hay una simulación sin aplicar. ¿Quieres descartarla y cambiar de producto?')) {
@@ -1604,6 +1699,8 @@ discardSimulationButton.addEventListener('click', () => {
 });
 
 applySimulatedPriceButton.addEventListener('click', () => {
+  // Antes de guardar comprobamos dos veces que producto e ingredientes no hayan
+  // cambiado. La segunda comprobación cubre el tiempo que tarda la confirmación.
   if (!simulatorProductData || applySimulatedPriceButton.disabled) return;
   if (editingProductId === simulatorProductData.id) {
     simulatorMessage.textContent = 'Este producto se está editando. Guarda o cancela esa edición antes de aplicar el precio simulado.';
@@ -1692,6 +1789,7 @@ applySimulatedPriceButton.addEventListener('click', () => {
 });
 
 productList.addEventListener('click', (event) => {
+  // Delegación de eventos para los botones que se generan por cada producto.
   const button = event.target.closest('button[data-action]');
   if (!button) return;
   const { action, productId } = button.dataset;
@@ -1802,6 +1900,8 @@ productForm.addEventListener('submit', (event) => {
     return;
   }
 
+  // Conservamos el ID al editar. Crear uno nuevo solo corresponde a un producto
+  // que todavía no existe en la colección.
   if (editingProductId !== null) {
     const productIndex = products.findIndex((saved) => saved.id === editingProductId);
     if (productIndex === -1
@@ -1836,6 +1936,8 @@ productForm.addEventListener('submit', (event) => {
 });
 
 function formatCalendarDate(date) {
+  // Construimos la fecha desde sus partes para mostrar el día local elegido,
+  // sin que una conversión UTC pueda desplazarlo al día anterior o posterior.
   const [year, month, day] = date.split('-').map(Number);
   return new Intl.DateTimeFormat('es-ES', {
     day: 'numeric', month: 'long', year: 'numeric',
@@ -1850,6 +1952,8 @@ function formatCalendarMonth(monthValue) {
 }
 
 function getSaleProductSignature(product, ingredients) {
+  // Esta firma reúne los datos que determinan el importe de una venta nueva.
+  // Sirve para detectar cambios entre la vista previa y el momento de guardar.
   return JSON.stringify({
     product: getStoredProductData(product),
     ingredients: getSimulatorIngredientSnapshot(product, ingredients),
@@ -1867,6 +1971,8 @@ function resetSalePreview(message = 'Completa la venta para calcular el resultad
 }
 
 function renderSalePreview(sale, message) {
+  // La vista previa muestra lo que quedaría capturado en la venta. Sus totales
+  // se calculan desde ese registro temporal, igual que en los datos guardados.
   const totals = calculateSaleTotals(sale);
   if (totals.error) {
     resetSalePreview(totals.error);
@@ -1881,6 +1987,8 @@ function renderSalePreview(sale, message) {
 }
 
 function populateSaleProducts(products) {
+  // Solo se pueden registrar ventas nuevas de productos activos. En una edición
+  // se conserva la referencia anterior, aunque el producto se haya archivado.
   const currentValue = saleProductInput.value || editingOriginalSaleData?.productId || '';
   saleProductInput.replaceChildren();
   const placeholder = document.createElement('option');
@@ -1909,6 +2017,8 @@ function populateSaleProducts(products) {
 }
 
 function updateSalePreview(knownProducts = null, knownIngredients = null) {
+  // Editar únicamente fecha o unidades respeta los importes históricos. Cambiar
+  // de producto obtiene en cambio su precio y coste actuales para la nueva venta.
   const units = saleUnitsInput.valueAsNumber;
   const productId = saleProductInput.value;
   if (!productId || !Number.isSafeInteger(units) || units <= 0) {
@@ -1959,6 +2069,8 @@ function createSaleTableCell(label, content, className = '') {
 }
 
 function renderDailySales(sales, products) {
+  // La tabla usa el nombre actual como ayuda visual, pero los ingresos y margen
+  // salen exclusivamente del registro histórico de cada venta.
   salesBody.replaceChildren();
   const selectedDate = salesDateFilterInput.value || getLocalDateString();
   salesDateFilterInput.value = selectedDate;
@@ -2026,6 +2138,8 @@ function renderDailySales(sales, products) {
 }
 
 function refreshSales(knownProducts = null, knownIngredients = null) {
+  // Una venta afecta también a Resultados, Equilibrio y Dashboard; refrescamos
+  // esas vistas derivadas sin guardar totales duplicados.
   try {
     const products = knownProducts ?? readProducts();
     const ingredients = knownIngredients ?? readIngredients();
@@ -2065,6 +2179,8 @@ function finishSaleEditing({ focus = true } = {}) {
 }
 
 function startEditingSale(sale) {
+  // Guardamos una copia original para decidir si se mantiene el histórico y
+  // para evitar sobrescribir cambios concurrentes de otra pestaña.
   editingSaleId = sale.id;
   editingOriginalSaleData = { ...sale };
   saleDateInput.value = sale.date;
@@ -2110,6 +2226,8 @@ saleForm.addEventListener('submit', (event) => {
 
   let unitSalePrice;
   let unitCost;
+  // Esta decisión protege el historial: receta y precio actuales solo se usan
+  // cuando se registra una venta o se cambia expresamente su producto.
   const keepsHistoricalValues = editingOriginalSaleData?.productId === productId;
   if (keepsHistoricalValues) {
     ({ unitSalePrice, unitCost } = editingOriginalSaleData);
@@ -2196,6 +2314,8 @@ salesDateFilterInput.addEventListener('change', () => {
 });
 
 salesBody.addEventListener('click', (event) => {
+  // Eliminar es definitivo porque las ventas no se archivan. Se reserva para
+  // corregir errores y siempre requiere una confirmación explícita.
   const button = event.target.closest('button[data-sale-action]');
   if (!button) return;
   const { saleAction, saleId } = button.dataset;
@@ -2247,6 +2367,8 @@ salesBody.addEventListener('click', (event) => {
 });
 
 function getExpenseFormData() {
+  // El ID se conserva durante una edición; al crear un gasto se genera uno
+  // estable para distinguir registros iguales del mismo día.
   return {
     id: editingExpenseId ?? crypto.randomUUID(),
     date: expenseDateInput.value,
@@ -2267,6 +2389,8 @@ function createExpenseTableCell(label, content, className = '') {
 }
 
 function renderDailyExpenses(expenses) {
+  // Primero resumimos y después ordenamos solo la vista. El orden no cambia
+  // cómo están almacenados los gastos ni modifica sus importes.
   expensesBody.replaceChildren();
   const selectedDate = expensesDateFilterInput.value || getLocalDateString();
   expensesDateFilterInput.value = selectedDate;
@@ -2325,6 +2449,7 @@ function renderDailyExpenses(expenses) {
 }
 
 function refreshExpenses() {
+  // Al variar gastos también cambian los resultados, el equilibrio y dashboard.
   try {
     renderDailyExpenses(readExpenses());
     refreshResults();
@@ -2383,6 +2508,8 @@ expenseForm.addEventListener('change', () => {
 });
 
 expenseForm.addEventListener('submit', (event) => {
+  // La validación incluye fecha no futura e importe positivo antes de intentar
+  // persistir. Si falla, el formulario permanece para que se pueda corregir.
   event.preventDefault();
   const expense = getExpenseFormData();
   const validationError = getExpenseValidationError(expense, { today: getLocalDateString() });
@@ -2436,6 +2563,8 @@ expensesSortInput.addEventListener('change', refreshExpenses);
 expensesSortDirectionInput.addEventListener('change', refreshExpenses);
 
 expensesBody.addEventListener('click', (event) => {
+  // Como en ventas, la eliminación de un gasto es una corrección definitiva y
+  // comprobamos que no hubiera cambiado mientras se mostraba la confirmación.
   const button = event.target.closest('button[data-expense-action]');
   if (!button) return;
   const { expenseAction, expenseId } = button.dataset;
@@ -2496,6 +2625,8 @@ function resetResultsOutputs() {
 }
 
 function renderResults(sales, expenses) {
+  // Resultados combina ventas históricas y gastos imputados al periodo elegido.
+  // No almacena sus cinco totales porque todos se pueden derivar de los registros.
   const period = resultsPeriodInput.value;
   const value = period === 'day' ? resultsDayInput.value : resultsMonthInput.value;
   const summary = calculateOperatingResults(sales, expenses, { period, value });
@@ -2533,6 +2664,8 @@ function refreshResults() {
 }
 
 function updateResultsPeriod() {
+  // Solo alternamos los controles de día y mes; la consulta se recalcula con
+  // el periodo que la persona ha seleccionado.
   const showsDay = resultsPeriodInput.value === 'day';
   resultsDayField.hidden = !showsDay;
   resultsMonthField.hidden = showsDay;
@@ -2565,10 +2698,14 @@ function resetBreakEvenOutputs() {
 }
 
 function formatDeduction(value) {
+  // Se muestra el signo de resta como explicación visual del cálculo, sin
+  // convertir el valor interno en negativo.
   return value === 0 ? '0 €' : `−${formatNumber(value)} €`;
 }
 
 function updateBreakEvenPeriodWarning(month) {
+  // El equilibrio no predice datos futuros. Avisamos especialmente en el mes
+  // actual porque todavía puede faltar registrar gastos o ventas.
   const currentMonth = getLocalDateString().slice(0, 7);
   breakEvenPeriodWarning.textContent = month === currentMonth
     ? 'Mes en curso. El cálculo utiliza únicamente las ventas y los gastos registrados hasta este momento. Los gastos todavía no registrados pueden modificar el punto de equilibrio; no se proyectan ventas ni gastos hasta final de mes.'
@@ -2576,6 +2713,8 @@ function updateBreakEvenPeriodWarning(month) {
 }
 
 function renderBreakEven(sales, expenses) {
+  // La lógica matemática está en break-even.js; esta función decide cómo
+  // presentar sus estados y explicaciones en la interfaz.
   const month = breakEvenMonthInput.value;
   updateBreakEvenPeriodWarning(month);
   const summary = calculateMonthlyBreakEven(sales, expenses, month);
@@ -2657,6 +2796,8 @@ function refreshBreakEven() {
 breakEvenMonthInput.addEventListener('change', refreshBreakEven);
 
 function clearPendingBackup(message = '') {
+  // La copia seleccionada se mantiene solo en memoria hasta confirmar. Limpiarla
+  // no modifica los datos existentes ni elimina el archivo original.
   pendingBackup = null;
   restoreBackupButton.disabled = true;
   backupSummary.replaceChildren();
@@ -2676,6 +2817,8 @@ function formatCount(count, singular, plural = `${singular}s`) {
 }
 
 function renderBackupSummary(summary, fileName) {
+  // Mostramos el contenido antes de permitir restaurar para que la persona vea
+  // qué colecciones reemplazará y las advertencias de formatos antiguos.
   backupSummary.replaceChildren();
   addBackupSummaryItem(summary.ingredients === 1 ? 'ingrediente' : 'ingredientes', summary.ingredients);
   addBackupSummaryItem(summary.products === 1 ? 'producto' : 'productos', summary.products);
@@ -2709,6 +2852,8 @@ function renderBackupSummary(summary, fileName) {
 }
 
 function hasPendingInterfaceChanges() {
+  // Detectamos estados no guardados para avisar que se descartarán únicamente
+  // después de que la restauración se complete correctamente.
   const ingredientHasData = editingIngredientId !== null
     || [...form.elements].some((control) => control instanceof HTMLInputElement
       && control.type !== 'checkbox' && control.value.trim() !== '');
@@ -2717,6 +2862,8 @@ function hasPendingInterfaceChanges() {
 }
 
 exportBackupButton.addEventListener('click', () => {
+  // Exportar crea un archivo JSON descargable; no es sincronización ni cambia
+  // localStorage. Primero leemos y validamos las cuatro colecciones.
   let ingredients;
   let products;
   let sales;
@@ -2732,6 +2879,8 @@ exportBackupButton.addEventListener('click', () => {
   }
 
   try {
+    // Blob representa el archivo en memoria y createObjectURL permite descargarlo
+    // desde el navegador sin necesitar un servidor.
     const backupDocument = createBackupDocument(ingredients, products, sales, expenses);
     const blob = new Blob([`${JSON.stringify(backupDocument, null, 2)}\n`], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -2749,12 +2898,16 @@ exportBackupButton.addEventListener('click', () => {
 });
 
 importBackupInput.addEventListener('change', async () => {
+  // Seleccionar un archivo solo lo lee y valida. La restauración es un segundo
+  // paso consciente para que un archivo inválido nunca sobrescriba datos.
   const [file] = importBackupInput.files;
   clearPendingBackup();
   if (!file) return;
 
   let expectedRawValues;
   try {
+    // Guardamos una instantánea del texto original para detectar si otra pestaña
+    // cambió localStorage mientras la persona revisaba esta copia.
     expectedRawValues = {
       ingredients: localStorage.getItem(storageKey),
       products: localStorage.getItem(productStorageKey),
@@ -2780,6 +2933,8 @@ importBackupInput.addEventListener('change', async () => {
 });
 
 restoreBackupButton.addEventListener('click', () => {
+  // Restaurar reemplaza las cuatro colecciones, no las fusiona. Las advertencias
+  // explican datos que se vaciarán o referencias históricas que se conservarán.
   if (!pendingBackup) return;
   const { data, summary, expectedRawValues } = pendingBackup;
   const isEmpty = summary.ingredients === 0 && summary.products === 0
@@ -2809,6 +2964,8 @@ restoreBackupButton.addEventListener('click', () => {
   }
 
   try {
+    // replaceStoredData valida otra vez, comprueba cambios concurrentes y revierte
+    // lo ya escrito si una operación falla; solo después limpiamos estados pendientes.
     replaceStoredData(localStorage, storageKeys, data, expectedRawValues);
     const restoredIngredients = readIngredients();
     readProducts();
@@ -2830,6 +2987,8 @@ restoreBackupButton.addEventListener('click', () => {
 });
 
 const today = getLocalDateString();
+// La inicialización fija límites y valores iniciales con la fecha local. Después
+// renderiza las secciones usando exclusivamente los datos que ya estén guardados.
 initializeNavigation();
 saleDateInput.max = today;
 salesDateFilterInput.max = today;

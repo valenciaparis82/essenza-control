@@ -3,10 +3,14 @@ import { calculateSaleTotals, getSaleValidationError } from './sales.js';
 import { getExpenseValidationError } from './expenses.js';
 
 function matchesPeriod(date, period, value) {
+  // Las fechas están en formato YYYY-MM-DD, por eso el prefijo YYYY-MM sirve
+  // para identificar un mes natural sin convertir ni desplazar fechas.
   return period === 'day' ? date === value : date.startsWith(`${value}-`);
 }
 
 export function calculateOperatingResults(sales, expenses, { period, value }) {
+  // Esta función reúne datos históricos de ventas y gastos, pero no escribe
+  // nada: Resultados es una consulta que siempre se puede recalcular.
   if (!Array.isArray(sales) || !Array.isArray(expenses)) {
     return { error: 'Las ventas o los gastos no tienen un formato válido.' };
   }
@@ -27,6 +31,8 @@ export function calculateOperatingResults(sales, expenses, { period, value }) {
   let saleCount = 0;
   let expenseCount = 0;
 
+  // Usamos el precio y coste capturados al registrar cada venta. No calculamos
+  // la receta actual, porque queremos reflejar lo ocurrido en aquella fecha.
   for (const sale of sales) {
     const validationError = getSaleValidationError(sale);
     const totals = validationError ? null : calculateSaleTotals(sale);
@@ -42,6 +48,8 @@ export function calculateOperatingResults(sales, expenses, { period, value }) {
     }
   }
 
+  // Separamos gasto fijo y variable porque el punto de equilibrio necesita
+  // tratarlos de forma distinta, aunque aquí se muestren sumados.
   for (const expense of expenses) {
     if (getExpenseValidationError(expense)) {
       return { error: 'No se pueden calcular los resultados porque hay un gasto inválido.' };
@@ -55,6 +63,7 @@ export function calculateOperatingResults(sales, expenses, { period, value }) {
     }
   }
 
+  // Fórmulas operativas del periodo. No son beneficio contable ni fiscal.
   const operatingExpenses = fixedExpenses + variableExpenses;
   const grossMargin = revenue - productCost;
   const operatingResult = grossMargin - operatingExpenses;
